@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SocialSense AI - Social Listening & Market Research SaaS",
-  description: "Extract real-time insights, customer sentiment, and competitor intelligence from social media platforms using AI-powered listening.",
+  title: "OmniPR Intelligence | Strategic Comms & Crisis Radar",
+  description: "Agency-grade PR intelligence platform for brand reputation management, real-time crisis detection, competitor Share of Voice benchmarking, and influencer sentiment tracking.",
 };
 
 export default function RootLayout({
