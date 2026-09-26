@@ -391,6 +391,8 @@ interface KeywordItem {
   created_at: string;
 }
 
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
+const WS_BASE = (process.env.NEXT_PUBLIC_WS_URL || API_BASE.replace(/^http/, "ws")).replace(/\/+$/, "");
 const DEFAULT_COMPANY_ID = "11111111-1111-1111-1111-111111111111";
 
 export default function SimplifiedSocialSenseDashboard() {
@@ -398,10 +400,12 @@ export default function SimplifiedSocialSenseDashboard() {
 
   // Multi-Tenant Auth & Session States
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [activeCompanyId, setActiveCompanyId] = useState<string>(DEFAULT_COMPANY_ID);
+  const [activeCompanyId, setActiveCompanyId] = useState<string>("");
   const [currentUser, setCurrentUser] = useState<{ email: string; companyName: string; role: string; companyId?: string } | null>(null);
-  const [loginEmail, setLoginEmail] = useState<string>("analyst@apexmotors.com");
-  const [loginPassword, setLoginPassword] = useState<string>("••••••••");
+  const [loginEmail, setLoginEmail] = useState<string>("");
+  const [loginPassword, setLoginPassword] = useState<string>("");
+  const [loginCompanyName, setLoginCompanyName] = useState<string>("");
+  const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
@@ -411,10 +415,8 @@ export default function SimplifiedSocialSenseDashboard() {
       const saved = localStorage.getItem("socialsense_session");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed?.email) {
-          if (parsed.companyId) {
-            setActiveCompanyId(parsed.companyId);
-          }
+        if (parsed?.email && parsed.companyId) {
+          setActiveCompanyId(parsed.companyId);
           setCurrentUser(parsed);
           setIsLoggedIn(true);
         }
@@ -432,12 +434,13 @@ export default function SimplifiedSocialSenseDashboard() {
     setLoginError(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/auth/login", {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: loginEmail.trim(),
-          password: loginPassword || "demo1234"
+          password: loginPassword || "demo1234",
+          company_name: loginCompanyName.trim() || undefined
         })
       });
 
@@ -460,16 +463,42 @@ export default function SimplifiedSocialSenseDashboard() {
         setLoginError(err.detail || "Invalid login credentials.");
       }
     } catch {
-      // Offline fallback
+      // Offline fallback: Strictly isolate company per email! Never reuse default company ID for different users
+      const emailClean = loginEmail.trim().toLowerCase();
+      let compName = loginCompanyName.trim();
+      if (!compName) {
+        if (emailClean.includes("apex")) {
+          compName = "Apex Motors";
+        } else if (emailClean.includes("orchan")) {
+          compName = "Orchan Consulting Asia";
+        } else if (emailClean.includes("@")) {
+          const domain = emailClean.split("@")[1].split(".")[0];
+          if (["gmail", "yahoo", "hotmail", "outlook", "icloud"].includes(domain.toLowerCase())) {
+            compName = emailClean.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) + "'s Brand";
+          } else {
+            compName = domain.charAt(0).toUpperCase() + domain.slice(1);
+          }
+        } else {
+          compName = "Client Workspace";
+        }
+      }
+
+      // Generate a deterministic isolated offline ID per email
+      const safeId = "offline-" + btoa(emailClean).replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
+      const targetCompId = emailClean === "analyst@apexmotors.com" ? DEFAULT_COMPANY_ID : safeId;
+
       const user = {
-        email: loginEmail.trim(),
-        companyName: loginEmail.toLowerCase().includes("orchan") ? "Orchan Consulting Asia" : "Apex Motors",
+        email: emailClean,
+        companyName: compName,
         role: "client",
-        companyId: DEFAULT_COMPANY_ID
+        companyId: targetCompId
       };
-      setActiveCompanyId(DEFAULT_COMPANY_ID);
+      setActiveCompanyId(targetCompId);
       setCurrentUser(user);
       setIsLoggedIn(true);
+      try {
+        localStorage.setItem("socialsense_session", JSON.stringify(user));
+      } catch {}
     } finally {
       setIsLoggingIn(false);
     }
@@ -478,11 +507,12 @@ export default function SimplifiedSocialSenseDashboard() {
   const handleQuickLogin = async (email: string, companyName: string, role: string) => {
     setLoginEmail(email);
     setIsLoggingIn(true);
+    setLoginError(null);
     try {
-      const res = await fetch("http://localhost:8000/api/auth/login", {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: "demo" })
+        body: JSON.stringify({ email, password: "demo", company_name: companyName })
       });
       if (res.ok) {
         const data = await res.json();
@@ -499,16 +529,24 @@ export default function SimplifiedSocialSenseDashboard() {
           localStorage.setItem("socialsense_session", JSON.stringify(user));
         } catch {}
       } else {
-        const user = { email, companyName, role, companyId: DEFAULT_COMPANY_ID };
-        setActiveCompanyId(DEFAULT_COMPANY_ID);
+        const safeId = email === "analyst@apexmotors.com" ? DEFAULT_COMPANY_ID : "offline-" + btoa(email).replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
+        const user = { email, companyName, role, companyId: safeId };
+        setActiveCompanyId(safeId);
         setCurrentUser(user);
         setIsLoggedIn(true);
+        try {
+          localStorage.setItem("socialsense_session", JSON.stringify(user));
+        } catch {}
       }
     } catch {
-      const user = { email, companyName, role, companyId: DEFAULT_COMPANY_ID };
-      setActiveCompanyId(DEFAULT_COMPANY_ID);
+      const safeId = email === "analyst@apexmotors.com" ? DEFAULT_COMPANY_ID : "offline-" + btoa(email).replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
+      const user = { email, companyName, role, companyId: safeId };
+      setActiveCompanyId(safeId);
       setCurrentUser(user);
       setIsLoggedIn(true);
+      try {
+        localStorage.setItem("socialsense_session", JSON.stringify(user));
+      } catch {}
     } finally {
       setIsLoggingIn(false);
     }
@@ -517,6 +555,10 @@ export default function SimplifiedSocialSenseDashboard() {
   const handleSignOut = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
+    setActiveCompanyId("");
+    setKeywords([]);
+    setPosts([]);
+    setSelectedKeyword("all");
     try {
       localStorage.removeItem("socialsense_session");
     } catch {}
@@ -581,10 +623,12 @@ export default function SimplifiedSocialSenseDashboard() {
   }, [messages, activeTab]);
 
   // Fetch real scraped posts from FastAPI
-  const fetchScrapedData = async () => {
+  const fetchScrapedData = async (targetCompanyId?: string) => {
+    const compId = targetCompanyId || activeCompanyId;
+    if (!compId) return;
     setIsLoadingPosts(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/companies/${activeCompanyId}/scraped-data`);
+      const res = await fetch(`${API_BASE}/api/companies/${compId}/scraped-data`);
       if (res.ok) {
         const data = await res.json();
         const rawList = Array.isArray(data) ? data : data.records || [];
@@ -634,29 +678,39 @@ export default function SimplifiedSocialSenseDashboard() {
   };
 
   // Fetch real keywords & quota from FastAPI
-  const fetchKeywords = async () => {
+  const fetchKeywords = async (targetCompanyId?: string) => {
+    const compId = targetCompanyId || activeCompanyId;
+    if (!compId) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/companies/${activeCompanyId}/keywords`);
+      const res = await fetch(`${API_BASE}/api/companies/${compId}/keywords`);
       if (res.ok) {
         const data = await res.json();
         setKeywords(Array.isArray(data) ? data : data.value || []);
+      } else {
+        const stored = localStorage.getItem(`socialsense_kws_${compId}`);
+        setKeywords(stored ? JSON.parse(stored) : []);
       }
-      const quotaRes = await fetch(`http://localhost:8000/api/companies/${activeCompanyId}/quota`);
+      const quotaRes = await fetch(`${API_BASE}/api/companies/${compId}/quota`);
       if (quotaRes.ok) {
         const quotaData = await quotaRes.json();
         if (typeof quotaData.max_keywords === "number") {
           setMaxKeywords(quotaData.max_keywords);
         }
+      } else {
+        setMaxKeywords(1);
       }
     } catch (err) {
       console.warn("Error fetching keywords or quota:", err);
+      const stored = localStorage.getItem(`socialsense_kws_${compId}`);
+      setKeywords(stored ? JSON.parse(stored) : []);
+      setMaxKeywords(1);
     }
   };
 
   // Check active scraping status from FastAPI backend
   const checkScraperStatus = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/scraper/status");
+      const res = await fetch(`${API_BASE}/api/scraper/status`);
       if (res.ok) {
         const data = await res.json();
         const active = Boolean(data.is_scraping);
@@ -674,16 +728,23 @@ export default function SimplifiedSocialSenseDashboard() {
     return false;
   };
 
-  // Initial load & WebSocket connection
+  // React strictly to activeCompanyId changes to prevent cross-account interception
   useEffect(() => {
-    fetchScrapedData();
-    fetchKeywords();
+    if (!activeCompanyId) return;
+
+    // Reset data first so previous account data never flashes or intercepts
+    setPosts([]);
+    setKeywords([]);
+    setSelectedKeyword("all");
+
+    fetchScrapedData(activeCompanyId);
+    fetchKeywords(activeCompanyId);
     checkScraperStatus();
 
-    // WebSocket real-time live ingestion listener
+    // WebSocket real-time live ingestion listener strictly scoped to this company_id room
     let ws: WebSocket | null = null;
     try {
-      ws = new WebSocket(`ws://localhost:8000/ws/${activeCompanyId}`);
+      ws = new WebSocket(`${WS_BASE}/ws/${activeCompanyId}`);
       ws.onopen = () => setWsConnected(true);
       ws.onclose = () => setWsConnected(false);
       ws.onerror = () => setWsConnected(false);
@@ -697,20 +758,20 @@ export default function SimplifiedSocialSenseDashboard() {
                 keyword_id: payload.keyword_id || "",
                 keyword_string: payload.keyword_string
               });
-              setScrapeNotice(`🚀 Live scraping running for "${payload.keyword_string}" (1 keyword at a time)...`);
+              setScrapeNotice(`🚀 Live scraping running for "${payload.keyword_string}"...`);
             }
           } else if (payload.event === "SCRAPING_STOPPED") {
             setIsScraping(false);
             setCurrentScrapingKeyword(null);
             setScrapeNotice(payload.message || "🛑 Scraping stopped.");
             setTimeout(() => setScrapeNotice(null), 6000);
-            fetchScrapedData();
+            fetchScrapedData(activeCompanyId);
           } else if (payload.event === "SCRAPING_FINISHED") {
             setIsScraping(false);
             setCurrentScrapingKeyword(null);
-            fetchScrapedData();
+            fetchScrapedData(activeCompanyId);
           } else if (payload.event === "NEW_SCRAPED_DATA" && Array.isArray(payload.records)) {
-            fetchScrapedData();
+            fetchScrapedData(activeCompanyId);
             checkScraperStatus();
           }
         } catch (e) {
@@ -724,7 +785,7 @@ export default function SimplifiedSocialSenseDashboard() {
     return () => {
       if (ws) ws.close();
     };
-  }, []);
+  }, [activeCompanyId]);
 
   // Poll status periodically when scraping is active to detect completion
   useEffect(() => {
@@ -739,12 +800,16 @@ export default function SimplifiedSocialSenseDashboard() {
   const handleAddKeyword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newKeywordInput.trim()) return;
+    if (keywords.length >= maxKeywords) {
+      setKeywordError(`Commercial Quota Limit Reached (${keywords.length}/${maxKeywords} active keywords). Upgrade tier to track more.`);
+      return;
+    }
 
     setIsAddingKeyword(true);
     setKeywordError(null);
 
     try {
-      const res = await fetch(`http://localhost:8000/api/companies/${activeCompanyId}/keywords`, {
+      const res = await fetch(`${API_BASE}/api/companies/${activeCompanyId}/keywords`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -767,9 +832,25 @@ export default function SimplifiedSocialSenseDashboard() {
 
       setNewKeywordInput("");
       setNewTopicContextInput("");
-      await fetchKeywords();
+      await fetchKeywords(activeCompanyId);
     } catch (err: any) {
-      setKeywordError(err.message || "Failed to add keyword");
+      // Local fallback for offline/isolated demo
+      const fallbackItem: KeywordItem = {
+        id: "kw-" + Date.now(),
+        keyword_string: newKeywordInput.trim(),
+        topic_context: newTopicContextInput.trim(),
+        is_active: true,
+        platform_flags: { tiktok: true, instagram: true, twitter: true, reddit: true, youtube: true },
+        created_at: new Date().toISOString()
+      };
+      const updated = [...keywords, fallbackItem];
+      setKeywords(updated);
+      try {
+        localStorage.setItem(`socialsense_kws_${activeCompanyId}`, JSON.stringify(updated));
+      } catch {}
+      setNewKeywordInput("");
+      setNewTopicContextInput("");
+      setKeywordError(null);
     } finally {
       setIsAddingKeyword(false);
     }
@@ -778,7 +859,7 @@ export default function SimplifiedSocialSenseDashboard() {
   // Update keyword topic context or status
   const handleUpdateKeywordContext = async (keywordId: string, topicContext: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/companies/${activeCompanyId}/keywords/${keywordId}`, {
+      const res = await fetch(`${API_BASE}/api/companies/${activeCompanyId}/keywords/${keywordId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -788,7 +869,7 @@ export default function SimplifiedSocialSenseDashboard() {
       if (res.ok) {
         setEditingKeywordId(null);
         setEditingContextText("");
-        await fetchKeywords();
+        await fetchKeywords(activeCompanyId);
       }
     } catch (err) {
       console.error("Failed to update keyword context:", err);
@@ -798,12 +879,16 @@ export default function SimplifiedSocialSenseDashboard() {
   // Delete keyword
   const handleDeleteKeyword = async (id: string) => {
     try {
-      await fetch(`http://localhost:8000/api/companies/${activeCompanyId}/keywords/${id}`, {
+      await fetch(`${API_BASE}/api/companies/${activeCompanyId}/keywords/${id}`, {
         method: "DELETE"
       });
-      await fetchKeywords();
+      await fetchKeywords(activeCompanyId);
     } catch (err) {
-      console.error("Failed to delete keyword:", err);
+      const updated = keywords.filter((k) => k.id !== id);
+      setKeywords(updated);
+      try {
+        localStorage.setItem(`socialsense_kws_${activeCompanyId}`, JSON.stringify(updated));
+      } catch {}
     }
   };
 
@@ -811,7 +896,7 @@ export default function SimplifiedSocialSenseDashboard() {
   const handleStopScrape = async () => {
     setIsStoppingScrape(true);
     try {
-      const res = await fetch("http://localhost:8000/api/scraper/stop", {
+      const res = await fetch(`${API_BASE}/api/scraper/stop`, {
         method: "POST"
       });
       if (res.ok) {
@@ -819,7 +904,7 @@ export default function SimplifiedSocialSenseDashboard() {
         setIsScraping(false);
         setScrapeNotice(data.message || "🛑 Scraping stopped. Cloud actors aborted.");
         setTimeout(() => setScrapeNotice(null), 8000);
-        await fetchScrapedData();
+        await fetchScrapedData(activeCompanyId);
       } else {
         const err = await res.json();
         setScrapeNotice(`Failed to stop scraping: ${err.detail || "Server error"}`);
@@ -837,7 +922,7 @@ export default function SimplifiedSocialSenseDashboard() {
     setScrapeNotice("Launching Apify scraper actors (100 posts per platform) across TikTok, Reddit, Instagram, X, and YouTube in the cloud...");
 
     try {
-      const res = await fetch(`http://localhost:8000/api/scraper/trigger/${keywordId}?limit=100`, {
+      const res = await fetch(`${API_BASE}/api/scraper/trigger/${keywordId}?limit=100`, {
         method: "POST"
       });
       if (res.ok) {
@@ -864,7 +949,7 @@ export default function SimplifiedSocialSenseDashboard() {
     setScrapeNotice(`🚀 Launching Apify scrapers for "${cleanKw}" (100 posts per platform) across TikTok, Reddit, Instagram, X, and YouTube...`);
 
     try {
-      const res = await fetch(`http://localhost:8000/api/scraper/quick-scrape`, {
+      const res = await fetch(`${API_BASE}/api/scraper/quick-scrape`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -878,18 +963,18 @@ export default function SimplifiedSocialSenseDashboard() {
       if (res.ok) {
         setIsScraping(true);
         setScrapeNotice(`✅ Scrapers launched for "${cleanKw}"! Ingesting real data into your live feed as actors complete.`);
-        await fetchKeywords();
+        await fetchKeywords(activeCompanyId);
         setTimeout(() => checkScraperStatus(), 1000);
       } else {
         // Fallback: add keyword first then trigger
-        const addRes = await fetch(`http://localhost:8000/api/companies/${activeCompanyId}/keywords`, {
+        const addRes = await fetch(`${API_BASE}/api/companies/${activeCompanyId}/keywords`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ keyword_string: cleanKw })
         });
         if (addRes.ok) {
           const kwData = await addRes.json();
-          await fetchKeywords();
+          await fetchKeywords(activeCompanyId);
           await handleRunScrape(kwData.id);
         } else {
           setIsScraping(false);
@@ -923,7 +1008,7 @@ export default function SimplifiedSocialSenseDashboard() {
       const activeKw = selectedKeyword !== "all" 
         ? keywords.find((k) => k.keyword_string.toLowerCase() === selectedKeyword.toLowerCase()) 
         : (keywords.length > 0 ? keywords[0] : null);
-      const res = await fetch("http://localhost:8000/api/chat", {
+      const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1023,8 +1108,36 @@ export default function SimplifiedSocialSenseDashboard() {
 
           {/* Login Card */}
           <div className="bg-[#121215]/90 border border-[#27272a] rounded-2xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
-            <h2 className="text-lg font-bold text-white mb-1">Sign In to Dashboard</h2>
-            <p className="text-xs text-zinc-400 mb-6">Enter your credentials or choose a quick demo client below.</p>
+            {/* Mode Switcher */}
+            <div className="flex border border-[#27272a] rounded-xl p-1 bg-[#18181b] mb-5">
+              <button
+                type="button"
+                onClick={() => { setIsSignUp(false); setLoginError(null); }}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  !isSignUp ? "bg-blue-600 text-white shadow" : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsSignUp(true); setLoginError(null); }}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  isSignUp ? "bg-blue-600 text-white shadow" : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                New Client Workspace
+              </button>
+            </div>
+
+            <h2 className="text-lg font-bold text-white mb-1">
+              {isSignUp ? "Create Brand Workspace" : "Sign In to Dashboard"}
+            </h2>
+            <p className="text-xs text-zinc-400 mb-6">
+              {isSignUp
+                ? "Set up a clean, isolated dashboard with 1 active tracked keyword."
+                : "Enter your credentials or choose a quick demo client below."}
+            </p>
 
             {loginError && (
               <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400 flex items-center gap-2">
@@ -1034,6 +1147,23 @@ export default function SimplifiedSocialSenseDashboard() {
             )}
 
             <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {isSignUp && (
+                <div>
+                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">Brand / Company Name</label>
+                  <div className="relative">
+                    <Target className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={loginCompanyName}
+                      onChange={(e) => setLoginCompanyName(e.target.value)}
+                      placeholder="e.g. Nike Malaysia, Dyson, Acme..."
+                      className="w-full bg-[#18181b] border border-[#27272a] focus:border-blue-500 text-sm text-white rounded-xl pl-10 pr-3 py-2.5 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-zinc-300 mb-1.5">Work Email</label>
                 <div className="relative">
@@ -1072,11 +1202,11 @@ export default function SimplifiedSocialSenseDashboard() {
                 {isLoggingIn ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Signing in...</span>
+                    <span>{isSignUp ? "Creating workspace..." : "Signing in..."}</span>
                   </>
                 ) : (
                   <>
-                    <span>Sign In</span>
+                    <span>{isSignUp ? "Create Workspace & Sign In" : "Sign In"}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -1227,9 +1357,9 @@ export default function SimplifiedSocialSenseDashboard() {
           <div className="flex items-center gap-2 pl-2 border-l border-[#27272a]">
             <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#18181b] border border-[#27272a] text-xs">
               <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-[10px] font-bold text-white">
-                {currentUser?.companyName?.[0] || "A"}
+                {currentUser?.companyName?.[0] || "C"}
               </div>
-              <span className="text-zinc-200 font-medium">{currentUser?.companyName || "Apex Motors"}</span>
+              <span className="text-zinc-200 font-medium">{currentUser?.companyName || "Client Workspace"}</span>
             </div>
 
             <button
