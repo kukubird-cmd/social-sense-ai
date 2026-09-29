@@ -931,6 +931,7 @@ export default function SimplifiedSocialSenseDashboard() {
         setTimeout(() => checkScraperStatus(), 1000);
       } else {
         setIsScraping(false);
+        const data = await res.json().catch(() => ({}));
         const detailMsg = typeof data.detail === "string" ? data.detail : (data.detail ? JSON.stringify(data.detail) : "Error triggering");
         setScrapeNotice(`Scrape warning: ${detailMsg}`);
       }
