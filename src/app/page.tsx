@@ -979,8 +979,11 @@ export default function SimplifiedSocialSenseDashboard() {
           await handleRunScrape(kwData.id);
         } else {
           setIsScraping(false);
-          const errData = await res.json();
-          setScrapeNotice(`Scrape notice: ${errData.detail || "Failed to launch scrapers"}`);
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = typeof errData.detail === "string"
+            ? errData.detail
+            : (Array.isArray(errData.detail) && errData.detail[0]?.msg ? errData.detail[0].msg : (errData.detail ? JSON.stringify(errData.detail) : "Failed to launch scrapers"));
+          setScrapeNotice(`Scrape notice: ${errMsg}`);
         }
       }
     } catch (err: any) {
