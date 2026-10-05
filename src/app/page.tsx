@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
 import {
   LayoutDashboard,
   Search,
@@ -391,8 +392,24 @@ interface KeywordItem {
   created_at: string;
 }
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
-const WS_BASE = (process.env.NEXT_PUBLIC_WS_URL || API_BASE.replace(/^http/, "ws")).replace(/\/+$/, "");
+let API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
+let WS_BASE = (process.env.NEXT_PUBLIC_WS_URL || API_BASE.replace(/^http/, "ws")).replace(/\/+$/, "");
+
+if (typeof window !== "undefined") {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const queryApi = params.get("api") || params.get("backend");
+    if (queryApi && (queryApi.startsWith("http://") || queryApi.startsWith("https://"))) {
+      localStorage.setItem("socialsense_custom_api_url", queryApi.replace(/\/+$/, ""));
+    }
+    const saved = localStorage.getItem("socialsense_custom_api_url");
+    if (saved && (saved.startsWith("http://") || saved.startsWith("https://"))) {
+      API_BASE = saved.replace(/\/+$/, "");
+      WS_BASE = API_BASE.replace(/^http/, "ws");
+    }
+  } catch {}
+}
+
 const DEFAULT_COMPANY_ID = "11111111-1111-1111-1111-111111111111";
 
 export default function SimplifiedSocialSenseDashboard() {
@@ -404,8 +421,6 @@ export default function SimplifiedSocialSenseDashboard() {
   const [currentUser, setCurrentUser] = useState<{ email: string; companyName: string; role: string; companyId?: string } | null>(null);
   const [loginEmail, setLoginEmail] = useState<string>("");
   const [loginPassword, setLoginPassword] = useState<string>("");
-  const [loginCompanyName, setLoginCompanyName] = useState<string>("");
-  const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
@@ -427,7 +442,11 @@ export default function SimplifiedSocialSenseDashboard() {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmail.trim()) {
-      setLoginError("Please enter your email address.");
+      setLoginError("Please enter your registered email address.");
+      return;
+    }
+    if (!loginPassword.trim()) {
+      setLoginError("Please enter your account password.");
       return;
     }
     setIsLoggingIn(true);
@@ -439,8 +458,7 @@ export default function SimplifiedSocialSenseDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: loginEmail.trim(),
-          password: loginPassword || "demo1234",
-          company_name: loginCompanyName.trim() || undefined
+          password: loginPassword.trim()
         })
       });
 
@@ -459,46 +477,11 @@ export default function SimplifiedSocialSenseDashboard() {
           localStorage.setItem("socialsense_session", JSON.stringify(user));
         } catch {}
       } else {
-        const err = await res.json();
-        setLoginError(err.detail || "Invalid login credentials.");
+        const err = await res.json().catch(() => ({}));
+        setLoginError(err.detail || "Account not found or invalid credentials. Only registered company accounts have access.");
       }
     } catch {
-      // Offline fallback: Strictly isolate company per email! Never reuse default company ID for different users
-      const emailClean = loginEmail.trim().toLowerCase();
-      let compName = loginCompanyName.trim();
-      if (!compName) {
-        if (emailClean.includes("apex")) {
-          compName = "Apex Motors";
-        } else if (emailClean.includes("orchan")) {
-          compName = "Orchan Consulting Asia";
-        } else if (emailClean.includes("@")) {
-          const domain = emailClean.split("@")[1].split(".")[0];
-          if (["gmail", "yahoo", "hotmail", "outlook", "icloud"].includes(domain.toLowerCase())) {
-            compName = emailClean.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) + "'s Brand";
-          } else {
-            compName = domain.charAt(0).toUpperCase() + domain.slice(1);
-          }
-        } else {
-          compName = "Client Workspace";
-        }
-      }
-
-      // Generate a deterministic isolated offline ID per email
-      const safeId = "offline-" + btoa(emailClean).replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
-      const targetCompId = emailClean === "analyst@apexmotors.com" ? DEFAULT_COMPANY_ID : safeId;
-
-      const user = {
-        email: emailClean,
-        companyName: compName,
-        role: "client",
-        companyId: targetCompId
-      };
-      setActiveCompanyId(targetCompId);
-      setCurrentUser(user);
-      setIsLoggedIn(true);
-      try {
-        localStorage.setItem("socialsense_session", JSON.stringify(user));
-      } catch {}
+      setLoginError(`Unable to reach the authentication server at ${API_BASE}. Please ensure the backend is running and reachable.`);
     } finally {
       setIsLoggingIn(false);
     }
@@ -512,7 +495,7 @@ export default function SimplifiedSocialSenseDashboard() {
       const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: "demo", company_name: companyName })
+        body: JSON.stringify({ email, password: "demo" })
       });
       if (res.ok) {
         const data = await res.json();
@@ -529,24 +512,11 @@ export default function SimplifiedSocialSenseDashboard() {
           localStorage.setItem("socialsense_session", JSON.stringify(user));
         } catch {}
       } else {
-        const safeId = email === "analyst@apexmotors.com" ? DEFAULT_COMPANY_ID : "offline-" + btoa(email).replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
-        const user = { email, companyName, role, companyId: safeId };
-        setActiveCompanyId(safeId);
-        setCurrentUser(user);
-        setIsLoggedIn(true);
-        try {
-          localStorage.setItem("socialsense_session", JSON.stringify(user));
-        } catch {}
+        const err = await res.json().catch(() => ({}));
+        setLoginError(err.detail || `Could not sign in to ${companyName}. Workspace is not registered on this server.`);
       }
     } catch {
-      const safeId = email === "analyst@apexmotors.com" ? DEFAULT_COMPANY_ID : "offline-" + btoa(email).replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
-      const user = { email, companyName, role, companyId: safeId };
-      setActiveCompanyId(safeId);
-      setCurrentUser(user);
-      setIsLoggedIn(true);
-      try {
-        localStorage.setItem("socialsense_session", JSON.stringify(user));
-      } catch {}
+      setLoginError(`Unable to reach authentication server at ${API_BASE}. Please check server connection.`);
     } finally {
       setIsLoggingIn(false);
     }
@@ -922,7 +892,7 @@ export default function SimplifiedSocialSenseDashboard() {
     setScrapeNotice("Launching Apify scraper actors (100 posts per platform) across TikTok, Reddit, Instagram, X, and YouTube in the cloud...");
 
     try {
-      const res = await fetch(`${API_BASE}/api/scraper/trigger/${keywordId}?limit=100`, {
+      const res = await fetch(`${API_BASE}/api/scraper/trigger/${keywordId}?company_id=${encodeURIComponent(activeCompanyId)}&limit=100`, {
         method: "POST"
       });
       if (res.ok) {
@@ -932,8 +902,8 @@ export default function SimplifiedSocialSenseDashboard() {
       } else {
         setIsScraping(false);
         const data = await res.json().catch(() => ({}));
-        const detailMsg = typeof data.detail === "string" ? data.detail : (data.detail ? JSON.stringify(data.detail) : "Error triggering");
-        setScrapeNotice(`Scrape warning: ${detailMsg}`);
+        const detailMsg = typeof data.detail === "string" ? data.detail : (data.detail ? JSON.stringify(data.detail) : "Error triggering scrape.");
+        setScrapeNotice(`⛔ ${detailMsg}`);
       }
     } catch (err: any) {
       setIsScraping(false);
@@ -941,10 +911,22 @@ export default function SimplifiedSocialSenseDashboard() {
     }
   };
 
-  // Quick Scrape any keyword (searched or custom)
+  // Quick Scrape any keyword (searched or custom) - strictly checks bought status for registered companies
   const handleQuickScrape = async (keywordText: string) => {
     const cleanKw = keywordText.trim();
     if (!cleanKw || isScraping) return;
+
+    // Check if the current company actually owns / bought this keyword
+    const registeredKw = keywords.find(
+      (k) => k.keyword_string.toLowerCase() === cleanKw.toLowerCase()
+    );
+
+    if (!registeredKw && currentUser?.role !== "admin") {
+      setScrapeNotice(
+        `⛔ Access Denied: "${cleanKw}" has not been purchased for company workspace "${currentUser?.companyName || "Client"}". Only registered companies can scrape keywords they have bought and activated in their plan.`
+      );
+      return;
+    }
 
     setIsScraping(true);
     setScrapeNotice(`🚀 Launching Apify scrapers for "${cleanKw}" (100 posts per platform) across TikTok, Reddit, Instagram, X, and YouTube...`);
@@ -967,28 +949,16 @@ export default function SimplifiedSocialSenseDashboard() {
         await fetchKeywords(activeCompanyId);
         setTimeout(() => checkScraperStatus(), 1000);
       } else {
-        // Fallback: add keyword first then trigger
-        const addRes = await fetch(`${API_BASE}/api/companies/${activeCompanyId}/keywords`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keyword_string: cleanKw })
-        });
-        if (addRes.ok) {
-          const kwData = await addRes.json();
-          await fetchKeywords(activeCompanyId);
-          await handleRunScrape(kwData.id);
-        } else {
-          setIsScraping(false);
-          const errData = await res.json().catch(() => ({}));
-          const errMsg = typeof errData.detail === "string"
-            ? errData.detail
-            : (Array.isArray(errData.detail) && errData.detail[0]?.msg ? errData.detail[0].msg : (errData.detail ? JSON.stringify(errData.detail) : "Failed to launch scrapers"));
-          setScrapeNotice(`Scrape notice: ${errMsg}`);
-        }
+        setIsScraping(false);
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = typeof errData.detail === "string"
+          ? errData.detail
+          : (Array.isArray(errData.detail) && errData.detail[0]?.msg ? errData.detail[0].msg : (errData.detail ? JSON.stringify(errData.detail) : "Failed to launch scrapers"));
+        setScrapeNotice(`⛔ ${errMsg}`);
       }
     } catch (err: any) {
       setIsScraping(false);
-      setScrapeNotice("Failed to trigger quick scrape. Check backend logs.");
+      setScrapeNotice("Failed to launch scrapers. Check backend connection.");
     }
   };
 
@@ -1112,36 +1082,15 @@ export default function SimplifiedSocialSenseDashboard() {
 
           {/* Login Card */}
           <div className="bg-[#121215]/90 border border-[#27272a] rounded-2xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
-            {/* Mode Switcher */}
-            <div className="flex border border-[#27272a] rounded-xl p-1 bg-[#18181b] mb-5">
-              <button
-                type="button"
-                onClick={() => { setIsSignUp(false); setLoginError(null); }}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  !isSignUp ? "bg-blue-600 text-white shadow" : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => { setIsSignUp(true); setLoginError(null); }}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  isSignUp ? "bg-blue-600 text-white shadow" : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                New Client Workspace
-              </button>
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-blue-400" />
+                Sign In to Registered Workspace
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Access is restricted to registered company tenants and bought keywords.
+              </p>
             </div>
-
-            <h2 className="text-lg font-bold text-white mb-1">
-              {isSignUp ? "Create Brand Workspace" : "Sign In to Dashboard"}
-            </h2>
-            <p className="text-xs text-zinc-400 mb-6">
-              {isSignUp
-                ? "Set up a clean, isolated dashboard with 1 active tracked keyword."
-                : "Enter your credentials or choose a quick demo client below."}
-            </p>
 
             {loginError && (
               <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400 flex items-center gap-2">
@@ -1151,25 +1100,8 @@ export default function SimplifiedSocialSenseDashboard() {
             )}
 
             <form onSubmit={handleLoginSubmit} className="space-y-4">
-              {isSignUp && (
-                <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">Brand / Company Name</label>
-                  <div className="relative">
-                    <Target className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={loginCompanyName}
-                      onChange={(e) => setLoginCompanyName(e.target.value)}
-                      placeholder="e.g. Nike Malaysia, Dyson, Acme..."
-                      className="w-full bg-[#18181b] border border-[#27272a] focus:border-blue-500 text-sm text-white rounded-xl pl-10 pr-3 py-2.5 outline-none transition-all"
-                    />
-                  </div>
-                </div>
-              )}
-
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">Work Email</label>
+                <label className="block text-xs font-medium text-zinc-300 mb-1.5">Registered Work Email</label>
                 <div className="relative">
                   <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -1177,14 +1109,14 @@ export default function SimplifiedSocialSenseDashboard() {
                     required
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="name@company.com"
+                    placeholder="analyst@yourcompany.com"
                     className="w-full bg-[#18181b] border border-[#27272a] focus:border-blue-500 text-sm text-white rounded-xl pl-10 pr-3 py-2.5 outline-none transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">Password</label>
+                <label className="block text-xs font-medium text-zinc-300 mb-1.5">Account Password</label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -1206,11 +1138,11 @@ export default function SimplifiedSocialSenseDashboard() {
                 {isLoggingIn ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{isSignUp ? "Creating workspace..." : "Signing in..."}</span>
+                    <span>Signing in...</span>
                   </>
                 ) : (
                   <>
-                    <span>{isSignUp ? "Create Workspace & Sign In" : "Sign In"}</span>
+                    <span>Sign In</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -1282,8 +1214,15 @@ export default function SimplifiedSocialSenseDashboard() {
             </div>
           </div>
 
-          <div className="mt-6 text-center text-[11px] text-zinc-500">
-            Protected by SocialSense AI Security &bull; Powered by Gemini 3 Flash
+          <div className="mt-6 text-center text-[11px] text-zinc-500 flex flex-col items-center gap-2">
+            <span>Protected by SocialSense AI Security &bull; Powered by Gemini 3 Flash</span>
+            <Link
+              href="/admin"
+              className="text-zinc-400 hover:text-blue-400 transition-colors inline-flex items-center gap-1.5 text-xs font-medium bg-[#18181b] hover:bg-[#202024] border border-[#27272a] hover:border-blue-500/30 px-3 py-1.5 rounded-lg"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
+              <span>Admin Tenant Provisioning &amp; Monitor Console &rarr;</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -1365,6 +1304,17 @@ export default function SimplifiedSocialSenseDashboard() {
               </div>
               <span className="text-zinc-200 font-medium">{currentUser?.companyName || "Client Workspace"}</span>
             </div>
+
+            {currentUser?.role === "admin" && (
+              <Link
+                href="/admin"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition-all cursor-pointer"
+                title="Open Admin Tenant Provisioning & Monitoring Console"
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="hidden md:inline">Admin Portal</span>
+              </Link>
+            )}
 
             <button
               onClick={handleSignOut}
