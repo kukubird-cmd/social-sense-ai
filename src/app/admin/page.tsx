@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import "../globals.css";
 import {
   ShieldCheck,
   Building2,
@@ -291,27 +292,92 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
   // -------------------------------------------------------------------------
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#09090b] text-zinc-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-[#121215] border border-[#27272a] rounded-2xl p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+      <div
+        className="min-h-screen bg-[#09090b] text-zinc-100 flex items-center justify-center p-4 font-sans"
+        style={{
+          minHeight: "100vh",
+          backgroundColor: "#09090b",
+          color: "#f4f4f5",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "1rem",
+          fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+        }}
+      >
+        <div
+          className="w-full max-w-md bg-[#121215] border border-[#27272a] rounded-2xl p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden"
+          style={{
+            width: "100%",
+            maxWidth: "28rem",
+            backgroundColor: "#121215",
+            border: "1px solid #27272a",
+            borderRadius: "1rem",
+            padding: "2rem",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7)",
+            position: "relative"
+          }}
+        >
+          <div
+            className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "4px",
+              background: "linear-gradient(to right, #3b82f6, #6366f1, #a855f7)"
+            }}
+          />
 
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-              <ShieldCheck className="w-5 h-5" />
+          <div className="flex items-center gap-3 mb-6" style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
+            <div
+              className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400"
+              style={{
+                width: "2.5rem",
+                height: "2.5rem",
+                borderRadius: "0.75rem",
+                backgroundColor: "rgba(59, 130, 246, 0.1)",
+                border: "1px solid rgba(59, 130, 246, 0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#60a5fa"
+              }}
+            >
+              <ShieldCheck className="w-5 h-5" style={{ width: "1.25rem", height: "1.25rem" }} />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white tracking-tight">SocialSense Monitor</h1>
-              <p className="text-xs text-zinc-400">Owner & Client Provisioning Portal</p>
+              <h1 className="text-lg font-bold text-white tracking-tight" style={{ fontSize: "1.125rem", fontWeight: 700, color: "#ffffff", margin: 0 }}>
+                SocialSense Monitor
+              </h1>
+              <p className="text-xs text-zinc-400" style={{ fontSize: "0.75rem", color: "#a1a1aa", margin: 0 }}>
+                Owner &amp; Client Provisioning Portal
+              </p>
             </div>
           </div>
 
-          <form onSubmit={handleAdminLogin} className="space-y-4">
+          <form onSubmit={handleAdminLogin} className="space-y-4" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+              <label
+                className="block text-xs font-medium text-zinc-300 mb-1.5"
+                style={{ display: "block", fontSize: "0.75rem", fontWeight: 500, color: "#d4d4d8", marginBottom: "0.375rem" }}
+              >
                 Admin Master Password
               </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <div className="relative" style={{ position: "relative" }}>
+                <Lock
+                  className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2"
+                  style={{
+                    width: "1rem",
+                    height: "1rem",
+                    color: "#71717a",
+                    position: "absolute",
+                    left: "0.875rem",
+                    top: "50%",
+                    transform: "translateY(-50%)"
+                  }}
+                />
                 <input
                   type="password"
                   required
@@ -319,13 +385,36 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                   onChange={(e) => setAdminKey(e.target.value)}
                   placeholder="Enter admin password (default: admin2026!)"
                   className="w-full bg-[#18181b] border border-[#27272a] focus:border-blue-500 text-sm text-white rounded-xl pl-10 pr-3 py-2.5 outline-none transition-all placeholder:text-zinc-600"
+                  style={{
+                    width: "100%",
+                    backgroundColor: "#18181b",
+                    border: "1px solid #27272a",
+                    color: "#ffffff",
+                    borderRadius: "0.75rem",
+                    padding: "0.625rem 0.75rem 0.625rem 2.5rem",
+                    fontSize: "0.875rem",
+                    boxSizing: "border-box"
+                  }}
                 />
               </div>
             </div>
 
             {authError && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+              <div
+                className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 flex items-center gap-2"
+                style={{
+                  padding: "0.75rem",
+                  backgroundColor: "rgba(244, 63, 94, 0.1)",
+                  border: "1px solid rgba(244, 63, 94, 0.2)",
+                  borderRadius: "0.75rem",
+                  color: "#fb7185",
+                  fontSize: "0.75rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem"
+                }}
+              >
+                <AlertCircle className="w-4 h-4 shrink-0" style={{ width: "1rem", height: "1rem" }} />
                 <span>{authError}</span>
               </div>
             )}
@@ -334,27 +423,47 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
               type="submit"
               disabled={isVerifying}
               className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium text-sm py-2.5 rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer"
+              style={{
+                width: "100%",
+                backgroundColor: "#2563eb",
+                color: "#ffffff",
+                fontWeight: 600,
+                fontSize: "0.875rem",
+                padding: "0.625rem 1rem",
+                borderRadius: "0.75rem",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+                boxShadow: "0 10px 15px -3px rgba(37, 99, 235, 0.3)"
+              }}
             >
               {isVerifying ? (
                 <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <RefreshCw className="w-4 h-4 animate-spin" style={{ width: "1rem", height: "1rem" }} />
                   <span>Verifying Master Key...</span>
                 </>
               ) : (
                 <>
                   <span>Unlock Admin Portal</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4" style={{ width: "1rem", height: "1rem" }} />
                 </>
               )}
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t border-[#27272a]/60 text-center">
+          <div
+            className="mt-6 pt-4 border-t border-[#27272a]/60 text-center"
+            style={{ marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid rgba(39, 39, 42, 0.6)", textAlign: "center" }}
+          >
             <Link
               href="/"
               className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors inline-flex items-center gap-1.5"
+              style={{ fontSize: "0.75rem", color: "#71717a", textDecoration: "none" }}
             >
-              <span>← Back to Client Dashboard</span>
+              <span>&larr; Back to Client Dashboard</span>
             </Link>
           </div>
         </div>
@@ -366,9 +475,31 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
   // 2. Authenticated Admin Portal
   // -------------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col">
+    <div
+      className="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col font-sans"
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#09090b",
+        color: "#f4f4f5",
+        display: "flex",
+        flexDirection: "column",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+      }}
+    >
       {/* Top Navbar */}
-      <header className="h-16 border-b border-[#27272a] bg-[#121215]/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
+      <header
+        className="h-16 border-b border-[#27272a] bg-[#121215]/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30"
+        style={{
+          height: "4rem",
+          backgroundColor: "#121215",
+          borderBottom: "1px solid #27272a",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingLeft: "1.5rem",
+          paddingRight: "1.5rem"
+        }}
+      >
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
             <ShieldCheck className="w-5 h-5" />
