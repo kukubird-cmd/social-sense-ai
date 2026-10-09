@@ -20,6 +20,7 @@ import {
   LogOut,
   ExternalLink,
   AlertCircle,
+  Eye,
   EyeOff,
   Sparkles,
   Ban,
@@ -47,6 +48,7 @@ interface ClientWorkspace {
     email: string;
     role: string;
     is_active: boolean;
+    initial_password?: string;
   } | null;
   assigned_keywords: AssignedKeyword[];
 }
@@ -99,6 +101,41 @@ export default function AdminMonitorPortal() {
   // Success provision result
   const [provisionSuccess, setProvisionSuccess] = useState<any | null>(null);
   const [copiedText, setCopiedText] = useState<boolean>(false);
+  const [revealedPasswordIds, setRevealedPasswordIds] = useState<Set<string>>(new Set());
+
+  const toggleRevealPassword = (id: string) => {
+    setRevealedPasswordIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleResetPassword = async (companyId: string, currentEmail: string) => {
+    const newPass = window.prompt(`Enter new login password for ${currentEmail}:`);
+    if (!newPass || !newPass.trim()) return;
+    const activeUrl = (backendUrl || API_BASE || PROD_BACKEND_URL).replace(/\/+$/, "");
+    try {
+      const res = await fetch(`${activeUrl}/api/admin/clients/${companyId}/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey.trim()
+        },
+        body: JSON.stringify({ new_password: newPass.trim() })
+      });
+      if (res.ok) {
+        alert(`Password for ${currentEmail} successfully updated to: ${newPass.trim()}`);
+        await fetchClients(adminKey, activeUrl);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Failed to update password.");
+      }
+    } catch (err: any) {
+      alert(`Network error: ${err.message || "Failed to reach backend."}`);
+    }
+  };
 
   // Auto-check stored admin key and initialize backend URL on mount
   useEffect(() => {
@@ -810,6 +847,7 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                 <tr className="border-b border-[#27272a] bg-[#18181b]/50 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
                   <th className="py-3 px-4">Company / Brand</th>
                   <th className="py-3 px-4">Client Login Email</th>
+                  <th className="py-3 px-4">Client Password</th>
                   <th className="py-3 px-4">Bought Tracked Keyword</th>
                   <th className="py-3 px-4">Quota</th>
                   <th className="py-3 px-4">Status</th>
@@ -820,14 +858,14 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
               <tbody className="divide-y divide-[#27272a]/60 text-xs">
                 {isLoading && clients.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-zinc-500">
+                    <td colSpan={8} className="py-12 text-center text-zinc-500">
                       <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-500" />
                       <span>Loading client workspaces...</span>
                     </td>
                   </tr>
                 ) : filteredClients.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-zinc-500">
+                    <td colSpan={8} className="py-12 text-center text-zinc-500">
                       <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30 text-zinc-400" />
                       <p className="text-zinc-400 font-medium">No client workspaces found</p>
                       <p className="text-[11px] text-zinc-600 mt-1">
@@ -863,6 +901,52 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                         {/* Email */}
                         <td className="py-3.5 px-4 text-zinc-300 font-mono text-[11px]">
                           {client.user?.email || "No user attached"}
+                        </td>
+
+                        {/* Password with Reveal / Copy / Reset */}
+                        <td className="py-3.5 px-4 font-mono text-[11px]">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded bg-[#18181b] border border-[#27272a] text-zinc-300 font-mono text-xs select-all">
+                              {revealedPasswordIds.has(client.id)
+                                ? (client.user?.initial_password || "••••••••")
+                                : "••••••••"}
+                            </span>
+                            {client.user?.initial_password ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRevealPassword(client.id)}
+                                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                                  title={revealedPasswordIds.has(client.id) ? "Hide password" : "Show password"}
+                                >
+                                  {revealedPasswordIds.has(client.id) ? (
+                                    <EyeOff className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <Eye className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(client.user?.initial_password || "");
+                                    alert(`Copied password for ${client.user?.email || client.name}`);
+                                  }}
+                                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                                  title="Copy password"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => handleResetPassword(client.id, client.user?.email || client.name)}
+                              className="p-1 rounded text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition cursor-pointer"
+                              title="Reset / change client password"
+                            >
+                              <Key className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
 
                         {/* Bought Keyword */}
