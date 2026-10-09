@@ -492,41 +492,6 @@ export default function SimplifiedSocialSenseDashboard() {
     }
   };
 
-  const handleQuickLogin = async (email: string, companyName: string, role: string) => {
-    setLoginEmail(email);
-    setIsLoggingIn(true);
-    setLoginError(null);
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: "demo" })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const user = {
-          email: data.email,
-          companyName: data.company_name,
-          role: data.role,
-          companyId: data.company_id
-        };
-        setActiveCompanyId(data.company_id);
-        setCurrentUser(user);
-        setIsLoggedIn(true);
-        try {
-          localStorage.setItem("socialsense_session", JSON.stringify(user));
-        } catch {}
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setLoginError(err.detail || `Could not sign in to ${companyName}. Workspace is not registered on this server.`);
-      }
-    } catch {
-      setLoginError(`Unable to reach authentication server at ${API_BASE}. Please check server connection.`);
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
   const handleSignOut = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
@@ -1153,70 +1118,6 @@ export default function SimplifiedSocialSenseDashboard() {
                 )}
               </button>
             </form>
-
-            {/* Divider */}
-            <div className="relative my-6 text-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#27272a]" />
-              </div>
-              <span className="relative px-3 bg-[#121215] text-[11px] text-zinc-500 uppercase tracking-wider font-semibold">
-                Quick 1-Click Access
-              </span>
-            </div>
-
-            {/* Quick Demo Logins */}
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("analyst@apexmotors.com", "Apex Motors (EV Client)", "client")}
-                className="w-full p-2.5 rounded-xl bg-[#18181b] hover:bg-[#202024] border border-[#27272a] hover:border-blue-500/40 text-left flex items-center justify-between transition-all group cursor-pointer"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center text-xs font-bold border border-blue-500/20">
-                    AM
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-zinc-200 group-hover:text-white">Apex Motors</div>
-                    <div className="text-[10px] text-zinc-500">Automotive / EV Brand Client</div>
-                  </div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-medium">1-Click Login</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("lead@orchan.asia", "Orchan Consulting Asia", "agency")}
-                className="w-full p-2.5 rounded-xl bg-[#18181b] hover:bg-[#202024] border border-[#27272a] hover:border-indigo-500/40 text-left flex items-center justify-between transition-all group cursor-pointer"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xs font-bold border border-indigo-500/20">
-                    OA
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-zinc-200 group-hover:text-white">Orchan Consulting Asia</div>
-                    <div className="text-[10px] text-zinc-500">PR & Communications Agency</div>
-                  </div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-medium">1-Click Login</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("admin@socialsense.ai", "System Administrator", "admin")}
-                className="w-full p-2.5 rounded-xl bg-[#18181b] hover:bg-[#202024] border border-[#27272a] hover:border-emerald-500/40 text-left flex items-center justify-between transition-all group cursor-pointer"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xs font-bold border border-emerald-500/20">
-                    SA
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-zinc-200 group-hover:text-white">Admin Sandbox</div>
-                    <div className="text-[10px] text-zinc-500">Full Access (Unlimited Mode)</div>
-                  </div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">1-Click Login</span>
-              </button>
-            </div>
           </div>
 
           <div className="mt-6 text-center text-[11px] text-zinc-500 flex flex-col items-center gap-2">
