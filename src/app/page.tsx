@@ -392,7 +392,8 @@ interface KeywordItem {
   created_at: string;
 }
 
-let API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
+const PROD_BACKEND_URL = "https://social-sense-backend-production.up.railway.app";
+let API_BASE = (process.env.NEXT_PUBLIC_API_URL || PROD_BACKEND_URL).replace(/\/+$/, "");
 let WS_BASE = (process.env.NEXT_PUBLIC_WS_URL || API_BASE.replace(/^http/, "ws")).replace(/\/+$/, "");
 
 if (typeof window !== "undefined") {
@@ -403,11 +404,9 @@ if (typeof window !== "undefined") {
       localStorage.setItem("socialsense_custom_api_url", queryApi.replace(/\/+$/, ""));
     }
     const saved = localStorage.getItem("socialsense_custom_api_url");
-    if (saved && (saved.includes("27fb827c3b1854ca") || saved.includes("serveousercontent.com"))) {
+    if (saved && (saved.includes("serveousercontent.com") || saved.includes("loca.lt") || saved.includes("27fb827c3b1854ca") || saved.includes("58af1039a0c44c60"))) {
       localStorage.removeItem("socialsense_custom_api_url");
-      API_BASE = (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes("27fb827c3b1854ca"))
-        ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "")
-        : "http://localhost:8000";
+      API_BASE = PROD_BACKEND_URL;
       WS_BASE = API_BASE.replace(/^http/, "ws");
     } else if (saved && (saved.startsWith("http://") || saved.startsWith("https://"))) {
       API_BASE = saved.replace(/\/+$/, "");

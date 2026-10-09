@@ -51,7 +51,8 @@ interface ClientWorkspace {
   assigned_keywords: AssignedKeyword[];
 }
 
-let API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
+const PROD_BACKEND_URL = "https://social-sense-backend-production.up.railway.app";
+let API_BASE = (process.env.NEXT_PUBLIC_API_URL || PROD_BACKEND_URL).replace(/\/+$/, "");
 
 if (typeof window !== "undefined") {
   try {
@@ -61,7 +62,11 @@ if (typeof window !== "undefined") {
       localStorage.setItem("socialsense_custom_api_url", queryApi.replace(/\/+$/, ""));
     }
     const saved = localStorage.getItem("socialsense_custom_api_url");
-    if (saved && (saved.startsWith("http://") || saved.startsWith("https://"))) {
+    if (saved && (saved.includes("serveousercontent.com") || saved.includes("loca.lt") || saved.includes("27fb827c3b1854ca") || saved.includes("58af1039a0c44c60"))) {
+      // Purge any dead temporary tunnels immediately
+      localStorage.removeItem("socialsense_custom_api_url");
+      API_BASE = PROD_BACKEND_URL;
+    } else if (saved && (saved.startsWith("http://") || saved.startsWith("https://"))) {
       API_BASE = saved.replace(/\/+$/, "");
     }
   } catch {}
@@ -72,7 +77,7 @@ export default function AdminMonitorPortal() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
-  const [backendUrl, setBackendUrl] = useState<string>("http://localhost:8000");
+  const [backendUrl, setBackendUrl] = useState<string>(PROD_BACKEND_URL);
   const [showConfig, setShowConfig] = useState<boolean>(false);
 
   // Data states
@@ -109,18 +114,18 @@ export default function AdminMonitorPortal() {
         } else {
           const saved = localStorage.getItem("socialsense_custom_api_url");
           // Stale / dead tunnel purge
-          if (saved && (saved.includes("27fb827c3b1854ca") || saved.includes("serveousercontent.com"))) {
+          if (saved && (saved.includes("serveousercontent.com") || saved.includes("loca.lt") || saved.includes("27fb827c3b1854ca") || saved.includes("58af1039a0c44c60"))) {
             localStorage.removeItem("socialsense_custom_api_url");
-            setBackendUrl("http://localhost:8000");
-            API_BASE = "http://localhost:8000";
+            setBackendUrl(PROD_BACKEND_URL);
+            API_BASE = PROD_BACKEND_URL;
           } else if (saved && (saved.startsWith("http://") || saved.startsWith("https://"))) {
             const clean = saved.replace(/\/+$/, "");
             setBackendUrl(clean);
             API_BASE = clean;
           } else {
-            const def = (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes("27fb827c3b1854ca"))
+            const def = (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes("serveousercontent.com"))
               ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "")
-              : "http://localhost:8000";
+              : PROD_BACKEND_URL;
             setBackendUrl(def);
             API_BASE = def;
           }
@@ -567,9 +572,25 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                   <div style={{ display: "flex", gap: "0.5rem", paddingTop: "0.25rem" }}>
                     <button
                       type="button"
-                      onClick={() => updateBackendUrl("http://localhost:8000")}
+                      onClick={() => updateBackendUrl(PROD_BACKEND_URL)}
                       style={{
                         flex: 1,
+                        padding: "0.25rem 0.5rem",
+                        fontSize: "0.6875rem",
+                        backgroundColor: "#1e1b4b",
+                        color: "#a5b4fc",
+                        borderRadius: "0.25rem",
+                        border: "1px solid #4338ca",
+                        cursor: "pointer",
+                        fontWeight: 600
+                      }}
+                    >
+                      🚀 Railway Production
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateBackendUrl("http://localhost:8000")}
+                      style={{
                         padding: "0.25rem 0.5rem",
                         fontSize: "0.6875rem",
                         backgroundColor: "#27272a",
@@ -579,13 +600,13 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                         cursor: "pointer"
                       }}
                     >
-                      💻 Localhost:8000
+                      💻 Localhost
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         localStorage.removeItem("socialsense_custom_api_url");
-                        updateBackendUrl("http://localhost:8000");
+                        updateBackendUrl(PROD_BACKEND_URL);
                       }}
                       style={{
                         padding: "0.25rem 0.5rem",
