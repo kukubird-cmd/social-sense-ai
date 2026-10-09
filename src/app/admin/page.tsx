@@ -72,6 +72,8 @@ export default function AdminMonitorPortal() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [backendUrl, setBackendUrl] = useState<string>("http://localhost:8000");
+  const [showConfig, setShowConfig] = useState<boolean>(false);
 
   // Data states
   const [clients, setClients] = useState<ClientWorkspace[]>([]);
@@ -93,9 +95,38 @@ export default function AdminMonitorPortal() {
   const [provisionSuccess, setProvisionSuccess] = useState<any | null>(null);
   const [copiedText, setCopiedText] = useState<boolean>(false);
 
-  // Auto-check stored admin key on mount
+  // Auto-check stored admin key and initialize backend URL on mount
   useEffect(() => {
     try {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const queryApi = params.get("api") || params.get("backend");
+        if (queryApi && (queryApi.startsWith("http://") || queryApi.startsWith("https://"))) {
+          const clean = queryApi.replace(/\/+$/, "");
+          localStorage.setItem("socialsense_custom_api_url", clean);
+          setBackendUrl(clean);
+          API_BASE = clean;
+        } else {
+          const saved = localStorage.getItem("socialsense_custom_api_url");
+          // Stale / dead tunnel purge
+          if (saved && (saved.includes("27fb827c3b1854ca") || saved.includes("serveousercontent.com"))) {
+            localStorage.removeItem("socialsense_custom_api_url");
+            setBackendUrl("http://localhost:8000");
+            API_BASE = "http://localhost:8000";
+          } else if (saved && (saved.startsWith("http://") || saved.startsWith("https://"))) {
+            const clean = saved.replace(/\/+$/, "");
+            setBackendUrl(clean);
+            API_BASE = clean;
+          } else {
+            const def = (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes("27fb827c3b1854ca"))
+              ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "")
+              : "http://localhost:8000";
+            setBackendUrl(def);
+            API_BASE = def;
+          }
+        }
+      }
+
       const stored = sessionStorage.getItem("socialsense_admin_key");
       if (stored) {
         setAdminKey(stored);
@@ -104,11 +135,23 @@ export default function AdminMonitorPortal() {
     } catch {}
   }, []);
 
-  const verifyAndFetch = async (key: string) => {
+  const updateBackendUrl = (url: string) => {
+    const clean = url.trim().replace(/\/+$/, "");
+    setBackendUrl(clean);
+    API_BASE = clean;
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("socialsense_custom_api_url", clean);
+      } catch {}
+    }
+  };
+
+  const verifyAndFetch = async (key: string, urlOverride?: string) => {
+    const activeUrl = (urlOverride || backendUrl || API_BASE || "http://localhost:8000").replace(/\/+$/, "");
     setIsVerifying(true);
     setAuthError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/verify`, {
+      const res = await fetch(`${activeUrl}/api/admin/verify`, {
         method: "POST",
         headers: { "x-admin-key": key.trim() }
       });
@@ -117,13 +160,14 @@ export default function AdminMonitorPortal() {
         try {
           sessionStorage.setItem("socialsense_admin_key", key.trim());
         } catch {}
-        await fetchClients(key.trim());
+        await fetchClients(key.trim(), activeUrl);
       } else {
         setIsAuthenticated(false);
         setAuthError("Invalid Admin Master Password. Access denied.");
       }
     } catch (err: any) {
-      setAuthError(`Unable to reach backend at ${API_BASE}. Ensure backend is running.`);
+      setAuthError(`Unable to reach backend at ${activeUrl}. Ensure backend is running.`);
+      setShowConfig(true);
     } finally {
       setIsVerifying(false);
     }
@@ -143,12 +187,13 @@ export default function AdminMonitorPortal() {
     } catch {}
   };
 
-  const fetchClients = async (keyToUse?: string) => {
+  const fetchClients = async (keyToUse?: string, urlToUse?: string) => {
     const k = keyToUse || adminKey;
     if (!k) return;
+    const activeUrl = (urlToUse || backendUrl || API_BASE || "http://localhost:8000").replace(/\/+$/, "");
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/clients`, {
+      const res = await fetch(`${activeUrl}/api/admin/clients`, {
         headers: { "x-admin-key": k.trim() }
       });
       if (res.ok) {
@@ -182,7 +227,8 @@ export default function AdminMonitorPortal() {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/provision`, {
+      const activeUrl = (backendUrl || API_BASE || "http://localhost:8000").replace(/\/+$/, "");
+      const res = await fetch(`${activeUrl}/api/admin/provision`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -208,7 +254,7 @@ export default function AdminMonitorPortal() {
         setBoughtKeyword("");
         setTopicContext("");
         setMaxKeywords(1);
-        await fetchClients();
+        await fetchClients(adminKey, activeUrl);
       } else {
         setFormError(data.detail || "Failed to provision client workspace.");
       }
@@ -221,8 +267,9 @@ export default function AdminMonitorPortal() {
 
   const handleToggleStatus = async (companyId: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "suspended" : "active";
+    const activeUrl = (backendUrl || API_BASE || "http://localhost:8000").replace(/\/+$/, "");
     try {
-      const res = await fetch(`${API_BASE}/api/admin/clients/${companyId}/status`, {
+      const res = await fetch(`${activeUrl}/api/admin/clients/${companyId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -231,7 +278,7 @@ export default function AdminMonitorPortal() {
         body: JSON.stringify({ billing_status: newStatus })
       });
       if (res.ok) {
-        await fetchClients();
+        await fetchClients(adminKey, activeUrl);
       }
     } catch (err) {
       console.error("Failed to update status:", err);
@@ -242,13 +289,14 @@ export default function AdminMonitorPortal() {
     if (!window.confirm(`Are you sure you want to permanently delete client workspace "${name}"? This cannot be undone.`)) {
       return;
     }
+    const activeUrl = (backendUrl || API_BASE || "http://localhost:8000").replace(/\/+$/, "");
     try {
-      const res = await fetch(`${API_BASE}/api/admin/clients/${companyId}`, {
+      const res = await fetch(`${activeUrl}/api/admin/clients/${companyId}`, {
         method: "DELETE",
         headers: { "x-admin-key": adminKey.trim() }
       });
       if (res.ok) {
-        await fetchClients();
+        await fetchClients(adminKey, activeUrl);
       }
     } catch (err) {
       console.error("Failed to delete workspace:", err);
@@ -452,6 +500,109 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                 </>
               )}
             </button>
+
+            {/* Backend URL Configurator */}
+            <div style={{ paddingTop: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => setShowConfig(!showConfig)}
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#a1a1aa",
+                  backgroundColor: "#18181b",
+                  border: "1px solid #27272a",
+                  borderRadius: "0.5rem",
+                  padding: "0.5rem 0.75rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  width: "100%",
+                  cursor: "pointer"
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "0.375rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span style={{ width: "0.5rem", height: "0.5rem", borderRadius: "9999px", backgroundColor: "#10b981", flexShrink: 0 }} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    Backend: {backendUrl}
+                  </span>
+                </span>
+                <span style={{ fontSize: "0.6875rem", color: "#60a5fa", fontWeight: 600, flexShrink: 0, marginLeft: "0.5rem" }}>
+                  {showConfig ? "Hide" : "Change URL"}
+                </span>
+              </button>
+
+              {showConfig && (
+                <div
+                  style={{
+                    marginTop: "0.5rem",
+                    padding: "0.75rem",
+                    backgroundColor: "#18181b",
+                    border: "1px solid #27272a",
+                    borderRadius: "0.75rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem"
+                  }}
+                >
+                  <label style={{ fontSize: "0.6875rem", fontWeight: 600, color: "#a1a1aa", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Target Backend API URL
+                  </label>
+                  <input
+                    type="text"
+                    value={backendUrl}
+                    onChange={(e) => updateBackendUrl(e.target.value)}
+                    placeholder="e.g. http://localhost:8000 or https://your-backend.up.railway.app"
+                    style={{
+                      width: "100%",
+                      backgroundColor: "#121215",
+                      border: "1px solid #3f3f46",
+                      color: "#ffffff",
+                      borderRadius: "0.5rem",
+                      padding: "0.5rem",
+                      fontSize: "0.75rem",
+                      fontFamily: "monospace",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: "0.5rem", paddingTop: "0.25rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => updateBackendUrl("http://localhost:8000")}
+                      style={{
+                        flex: 1,
+                        padding: "0.25rem 0.5rem",
+                        fontSize: "0.6875rem",
+                        backgroundColor: "#27272a",
+                        color: "#d4d4d8",
+                        borderRadius: "0.25rem",
+                        border: "1px solid #3f3f46",
+                        cursor: "pointer"
+                      }}
+                    >
+                      💻 Localhost:8000
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.removeItem("socialsense_custom_api_url");
+                        updateBackendUrl("http://localhost:8000");
+                      }}
+                      style={{
+                        padding: "0.25rem 0.5rem",
+                        fontSize: "0.6875rem",
+                        backgroundColor: "#27272a",
+                        color: "#fda4af",
+                        borderRadius: "0.25rem",
+                        border: "1px solid #3f3f46",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </form>
 
           <div

@@ -403,7 +403,13 @@ if (typeof window !== "undefined") {
       localStorage.setItem("socialsense_custom_api_url", queryApi.replace(/\/+$/, ""));
     }
     const saved = localStorage.getItem("socialsense_custom_api_url");
-    if (saved && (saved.startsWith("http://") || saved.startsWith("https://"))) {
+    if (saved && (saved.includes("27fb827c3b1854ca") || saved.includes("serveousercontent.com"))) {
+      localStorage.removeItem("socialsense_custom_api_url");
+      API_BASE = (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes("27fb827c3b1854ca"))
+        ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "")
+        : "http://localhost:8000";
+      WS_BASE = API_BASE.replace(/^http/, "ws");
+    } else if (saved && (saved.startsWith("http://") || saved.startsWith("https://"))) {
       API_BASE = saved.replace(/\/+$/, "");
       WS_BASE = API_BASE.replace(/^http/, "ws");
     }
