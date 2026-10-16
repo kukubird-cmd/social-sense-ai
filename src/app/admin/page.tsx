@@ -25,7 +25,8 @@ import {
   Sparkles,
   Ban,
   CheckCircle2,
-  X
+  X,
+  Edit3
 } from "lucide-react";
 
 interface AssignedKeyword {
@@ -131,6 +132,62 @@ export default function AdminMonitorPortal() {
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.detail || "Failed to update password.");
+      }
+    } catch (err: any) {
+      alert(`Network error: ${err.message || "Failed to reach backend."}`);
+    }
+  };
+
+  const handleUpdateQuota = async (companyId: string, currentMax: number, clientName: string) => {
+    const input = window.prompt(
+      `Set allowed keyword quota for "${clientName}":`,
+      String(currentMax || 1)
+    );
+    if (!input || !input.trim()) return;
+    const newQuota = parseInt(input.trim(), 10);
+    if (isNaN(newQuota) || newQuota < 1) {
+      alert("Please enter a valid number of keywords (at least 1).");
+      return;
+    }
+    const activeUrl = (backendUrl || API_BASE || "http://localhost:8000").replace(/\/+$/, "");
+    try {
+      const res = await fetch(`${activeUrl}/api/admin/clients/${companyId}/quota`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey.trim()
+        },
+        body: JSON.stringify({ max_keywords: newQuota })
+      });
+      if (res.ok) {
+        await fetchClients(adminKey, activeUrl);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Failed to update keyword quota.");
+      }
+    } catch (err: any) {
+      alert(`Network error: ${err.message || "Failed to reach backend."}`);
+    }
+  };
+
+  const handleAddKeywordToClient = async (companyId: string, clientName: string) => {
+    const kw = window.prompt(`Add new tracked keyword for "${clientName}":`);
+    if (!kw || !kw.trim()) return;
+    const activeUrl = (backendUrl || API_BASE || "http://localhost:8000").replace(/\/+$/, "");
+    try {
+      const res = await fetch(`${activeUrl}/api/admin/clients/${companyId}/keywords`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey.trim()
+        },
+        body: JSON.stringify({ keyword: kw.trim() })
+      });
+      if (res.ok) {
+        await fetchClients(adminKey, activeUrl);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Failed to add keyword.");
       }
     } catch (err: any) {
       alert(`Network error: ${err.message || "Failed to reach backend."}`);
@@ -348,13 +405,17 @@ export default function AdminMonitorPortal() {
   const copyWelcomeTemplate = () => {
     if (!provisionSuccess) return;
     const loginUrl = window.location.origin;
+    const kwDisplay = Array.isArray(provisionSuccess.keywords) && provisionSuccess.keywords.length > 0
+      ? provisionSuccess.keywords.map((k: any) => `"${k.keyword_string}"`).join(", ")
+      : `"${provisionSuccess.keyword?.keyword_string || ""}"`;
+    const quotaDisplay = provisionSuccess.max_keywords || provisionSuccess.company?.max_keywords || 1;
     const text = `🎉 Welcome to SocialSense AI!
 
 Here are your dedicated workspace login credentials:
 🌐 Dashboard URL: ${loginUrl}
 👤 Login Email: ${provisionSuccess.credentials.email}
 🔑 Password: ${provisionSuccess.credentials.password}
-🎯 Tracked Keyword: "${provisionSuccess.keyword.keyword_string}" (Plan: 1 Keyword)
+🎯 Tracked Keyword(s): ${kwDisplay} (Plan Quota: ${quotaDisplay} Keywords)
 
 Log in anytime to run real-time market research and AI competitor sentiment analysis!`;
 
@@ -782,7 +843,7 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
             <div>
               <p className="text-xs text-zinc-400 font-medium">Tracked Bought Keywords</p>
               <h3 className="text-2xl font-bold text-white mt-1">{totalKeywords}</h3>
-              <p className="text-[10px] text-indigo-400 mt-1">Strict 1 Keyword Plan Enforced</p>
+              <p className="text-[10px] text-indigo-400 mt-1">Multi-Keyword Quota Enabled</p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
               <Key className="w-5 h-5" />
@@ -848,7 +909,7 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                   <th className="py-3 px-4">Company / Brand</th>
                   <th className="py-3 px-4">Client Login Email</th>
                   <th className="py-3 px-4">Client Password</th>
-                  <th className="py-3 px-4">Bought Tracked Keyword</th>
+                  <th className="py-3 px-4">Bought Tracked Keywords</th>
                   <th className="py-3 px-4">Quota</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Created Date</th>
@@ -875,7 +936,6 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                   </tr>
                 ) : (
                   filteredClients.map((client) => {
-                    const primaryKw = client.assigned_keywords[0];
                     const isSuspended = client.billing_status === "suspended";
 
                     return (
@@ -949,23 +1009,53 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                           </div>
                         </td>
 
-                        {/* Bought Keyword */}
+                        {/* Bought Keywords */}
                         <td className="py-3.5 px-4">
-                          {primaryKw ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-medium">
-                              <Lock className="w-3 h-3 text-blue-400" />
-                              <span>"{primaryKw.keyword_string}"</span>
-                            </div>
-                          ) : (
-                            <span className="text-zinc-500 italic text-[11px]">No keyword registered</span>
-                          )}
+                          <div className="flex flex-wrap items-center gap-1.5 max-w-xs">
+                            {client.assigned_keywords && client.assigned_keywords.length > 0 ? (
+                              client.assigned_keywords.map((kw) => (
+                                <div
+                                  key={kw.id}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-medium"
+                                >
+                                  <Lock className="w-2.5 h-2.5 text-blue-400" />
+                                  <span>"{kw.keyword_string}"</span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-zinc-500 italic text-[11px]">No keywords assigned</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleAddKeywordToClient(client.id, client.name)}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 hover:bg-blue-600 text-zinc-300 hover:text-white transition cursor-pointer"
+                              title="Add another keyword for this client"
+                            >
+                              <Plus className="w-2.5 h-2.5" />
+                              <span>Add</span>
+                            </button>
+                          </div>
                         </td>
 
                         {/* Quota */}
                         <td className="py-3.5 px-4">
-                          <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[11px] font-mono border border-zinc-700">
-                            {client.active_keywords_count} / {client.max_keywords} kw
-                          </span>
+                          <div className="inline-flex items-center gap-1.5">
+                            <span className={`px-2 py-0.5 rounded-md text-[11px] font-mono border ${
+                              client.active_keywords_count >= client.max_keywords
+                                ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                                : "bg-zinc-800 text-zinc-300 border-zinc-700"
+                            }`}>
+                              {client.active_keywords_count} / {client.max_keywords} kw
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateQuota(client.id, client.max_keywords, client.name)}
+                              className="p-1 rounded text-zinc-400 hover:text-blue-400 hover:bg-zinc-800 transition cursor-pointer"
+                              title="Edit keyword quota limit for this client"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
 
                         {/* Billing Status */}
@@ -1074,12 +1164,18 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                     <span className="text-emerald-400 font-bold">{provisionSuccess.credentials.password}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Bought Keyword:</span>
-                    <span className="text-amber-400 font-semibold">"{provisionSuccess.keyword.keyword_string}"</span>
+                    <span className="text-zinc-500">Bought Keyword(s):</span>
+                    <span className="text-amber-400 font-semibold">
+                      {Array.isArray(provisionSuccess.keywords) && provisionSuccess.keywords.length > 0
+                        ? provisionSuccess.keywords.map((k: any) => `"${k.keyword_string}"`).join(", ")
+                        : `"${provisionSuccess.keyword?.keyword_string || ""}"`}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Keyword Limit:</span>
-                    <span className="text-zinc-300">Locked to 1 Keyword</span>
+                    <span className="text-zinc-500">Keyword Quota:</span>
+                    <span className="text-zinc-300 font-semibold">
+                      {provisionSuccess.max_keywords || provisionSuccess.company?.max_keywords || 1} Keywords Allowed
+                    </span>
                   </div>
                 </div>
 
@@ -1168,22 +1264,42 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                 </div>
 
                 <div className="p-3.5 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-blue-300 mb-1 flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>Bought Tracked Keyword (Strictly Locked) *</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={boughtKeyword}
-                      onChange={(e) => setBoughtKeyword(e.target.value)}
-                      placeholder="e.g. nike, dyson supersonic, proton x50..."
-                      className="w-full bg-[#18181b] border border-blue-500/30 focus:border-blue-400 text-xs text-white rounded-xl px-3 py-2 outline-none transition-all"
-                    />
-                    <p className="text-[10px] text-zinc-400 mt-1">
-                      This is the <strong>only</strong> keyword this client will be permitted to track and scrape.
-                    </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-blue-300 mb-1 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Bought Tracked Keyword(s) *</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={boughtKeyword}
+                        onChange={(e) => setBoughtKeyword(e.target.value)}
+                        placeholder="e.g. nike, airmax, jordan (comma-separated)"
+                        className="w-full bg-[#18181b] border border-blue-500/30 focus:border-blue-400 text-xs text-white rounded-xl px-3 py-2 outline-none transition-all"
+                      />
+                      <p className="text-[10px] text-zinc-400 mt-1">
+                        Separate multiple keywords with commas. Client can only track these keywords.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                        Allowed Quota *
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        required
+                        value={maxKeywords}
+                        onChange={(e) => setMaxKeywords(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full bg-[#18181b] border border-[#27272a] focus:border-blue-500 text-xs text-white rounded-xl px-3 py-2 outline-none transition-all font-mono"
+                      />
+                      <p className="text-[10px] text-zinc-400 mt-1">
+                        Max keywords allowed
+                      </p>
+                    </div>
                   </div>
 
                   <div>
