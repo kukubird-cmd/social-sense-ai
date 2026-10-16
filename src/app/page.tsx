@@ -52,6 +52,7 @@ const PLATFORM_CONFIG: Record<string, { label: string; color: string; bg: string
   twitter: { label: "X / Twitter", color: "text-sky-400", bg: "bg-sky-500/10 border-sky-500/20" },
   reddit: { label: "Reddit", color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20" },
   youtube: { label: "YouTube", color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
+  threads: { label: "Threads", color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
   unknown: { label: "Social", color: "text-zinc-400", bg: "bg-zinc-500/10 border-zinc-500/20" }
 };
 
@@ -144,6 +145,8 @@ function renderFormattedInline(text: string): React.ReactNode {
         platformBadgeStyle = "text-cyan-400 hover:text-cyan-300 border-cyan-500/40 bg-cyan-950/30 hover:bg-cyan-950/50";
       } else if (lower.includes("instagram")) {
         platformBadgeStyle = "text-pink-400 hover:text-pink-300 border-pink-500/40 bg-pink-950/30 hover:bg-pink-950/50";
+      } else if (lower.includes("threads") || lower.includes("threads.net")) {
+        platformBadgeStyle = "text-emerald-400 hover:text-emerald-300 border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-950/50";
       } else if (lower.includes("twitter") || lower.includes("x.com")) {
         platformBadgeStyle = "text-sky-400 hover:text-sky-300 border-sky-500/40 bg-sky-950/30 hover:bg-sky-950/50";
       }
@@ -547,7 +550,7 @@ export default function SimplifiedSocialSenseDashboard() {
     {
       id: "welcome-1",
       sender: "gemini",
-      text: "Hello! I am your **Gemini AI Social Analyst**.\n\nI have direct access to your live database of scraped comments and posts across TikTok, Reddit, Instagram, X/Twitter, and YouTube.\n\nAsk me anything — I will analyze real social discussions, summarize public sentiment, or flag crisis issues for you!",
+      text: "Hello! I am your **Gemini AI Social Analyst**.\n\nI have direct access to your live database of scraped comments and posts across TikTok, Reddit, Instagram, X/Twitter, YouTube, and Threads.\n\nAsk me anything — I will analyze real social discussions, summarize public sentiment, or flag crisis issues for you!",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     }
   ]);
@@ -760,7 +763,8 @@ export default function SimplifiedSocialSenseDashboard() {
             instagram: true,
             twitter: true,
             reddit: true,
-            youtube: true
+            youtube: true,
+            threads: true
           }
         })
       });
@@ -780,7 +784,7 @@ export default function SimplifiedSocialSenseDashboard() {
         keyword_string: newKeywordInput.trim(),
         topic_context: newTopicContextInput.trim(),
         is_active: true,
-        platform_flags: { tiktok: true, instagram: true, twitter: true, reddit: true, youtube: true },
+        platform_flags: { tiktok: true, instagram: true, twitter: true, reddit: true, youtube: true, threads: true },
         created_at: new Date().toISOString()
       };
       const updated = [...keywords, fallbackItem];
@@ -859,7 +863,7 @@ export default function SimplifiedSocialSenseDashboard() {
   // Trigger live Apify scrape
   const handleRunScrape = async (keywordId: string) => {
     setIsScraping(true);
-    setScrapeNotice("Launching Apify scraper actors (100 posts per platform) across TikTok, Reddit, Instagram, X, and YouTube in the cloud...");
+    setScrapeNotice("Launching Apify scraper actors (100 posts per platform) across TikTok, Reddit, Instagram, X, YouTube, and Threads in the cloud...");
 
     try {
       const res = await fetch(`${API_BASE}/api/scraper/trigger/${keywordId}?company_id=${encodeURIComponent(activeCompanyId)}&limit=100`, {
@@ -899,7 +903,7 @@ export default function SimplifiedSocialSenseDashboard() {
     }
 
     setIsScraping(true);
-    setScrapeNotice(`🚀 Launching Apify scrapers for "${cleanKw}" (100 posts per platform) across TikTok, Reddit, Instagram, X, and YouTube...`);
+    setScrapeNotice(`🚀 Launching Apify scrapers for "${cleanKw}" (100 posts per platform) across TikTok, Reddit, Instagram, X, YouTube, and Threads...`);
 
     try {
       const res = await fetch(`${API_BASE}/api/scraper/quick-scrape`, {
@@ -908,7 +912,7 @@ export default function SimplifiedSocialSenseDashboard() {
         body: JSON.stringify({
           company_id: activeCompanyId,
           keyword_string: cleanKw,
-          platforms: "tiktok,instagram,twitter,reddit,youtube",
+          platforms: "tiktok,instagram,twitter,reddit,youtube,threads",
           limit: 100
         })
       });
@@ -1521,6 +1525,7 @@ export default function SimplifiedSocialSenseDashboard() {
                   <option value="tiktok">TikTok</option>
                   <option value="reddit">Reddit</option>
                   <option value="instagram">Instagram</option>
+                  <option value="threads">Threads</option>
                   <option value="twitter">X / Twitter</option>
                   <option value="youtube">YouTube</option>
                 </select>
@@ -1677,7 +1682,7 @@ export default function SimplifiedSocialSenseDashboard() {
                 </h3>
                 <p className="text-xs text-zinc-400 max-w-lg mx-auto mb-5 leading-relaxed">
                   {searchQuery
-                    ? `"${searchQuery}" hasn't been scraped yet, or no social mentions match your active filters. Click below to launch live Apify scrapers across TikTok, Reddit, Instagram, X, and YouTube!`
+                    ? `"${searchQuery}" hasn't been scraped yet, or no social mentions match your active filters. Click below to launch live Apify scrapers across TikTok, Reddit, Instagram, X, YouTube, and Threads!`
                     : selectedPlatform !== "all" || selectedSentiment !== "all" || selectedKeyword !== "all"
                     ? "No posts match your selected filters. Try clearing your filters or search query."
                     : "No social data has been scraped yet. Add a keyword in the Keywords tab and run a scrape!"}
@@ -2105,7 +2110,7 @@ export default function SimplifiedSocialSenseDashboard() {
                   </span>
                 </div>
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  Your organization is subscribed to the <strong>Enterprise Market Intelligence Tier</strong>. Each tracked brand term collects up to 100 posts per platform across TikTok, Instagram, Reddit, X, and YouTube with strict single-keyword concurrency and isolation.
+                  Your organization is subscribed to the <strong>Enterprise Market Intelligence Tier</strong>. Each tracked brand term collects up to 100 posts per platform across TikTok, Instagram, Reddit, X, YouTube, and Threads with strict single-keyword concurrency and isolation.
                 </p>
               </div>
 
@@ -2263,7 +2268,7 @@ export default function SimplifiedSocialSenseDashboard() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-3 text-xs text-zinc-400 mt-1">
-                            <span>Platforms: TikTok, Reddit, Instagram, X, YouTube</span>
+                            <span>Platforms: TikTok, Reddit, Instagram, X, YouTube, Threads</span>
                             <button
                               onClick={() => {
                                 setEditingKeywordId(kw.id);

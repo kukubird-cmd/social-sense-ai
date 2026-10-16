@@ -1,4 +1,4 @@
-export type PlatformType = 'reddit' | 'twitter' | 'tiktok' | 'youtube' | 'instagram';
+export type PlatformType = 'reddit' | 'twitter' | 'tiktok' | 'youtube' | 'instagram' | 'threads';
 
 export type PRSignal = 
   | 'Crisis Threat' 
@@ -275,6 +275,21 @@ const influencerRadarPosts: Post[] = [
       commentSentiment: { positive: 8, neutral: 14, negative: 78 },
       reachEstimate: 920000
     }
+  },
+  {
+    id: 'post-threads-1',
+    platform: 'threads',
+    author: 'Tech & Trends Asia',
+    handle: '@techtrends_asia',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+    content: 'Interesting shift this quarter: seeing massive community discussion moving onto Threads. Consumers are sharing unvarnished first-hand experiences here rather than polished PR feeds. Brands that monitor Threads are catching product issues days before Twitter!',
+    sentiment: 'positive',
+    signal: 'Brand Praise',
+    engagement: { likes: 1420, shares: 380, comments: 165 },
+    date: '2026-09-05T09:30:00Z',
+    url: 'https://www.threads.net/@techtrends_asia/post/DA129bc81x',
+    aiSummary: 'Industry analyst noting the surge of consumer brand discussions on Threads and highlighting early detection benefits.',
+    prActionRecommendation: 'Proactive Engagement: Share thought leadership insights and engage with tech community replies on Threads.'
   }
 ];
 
