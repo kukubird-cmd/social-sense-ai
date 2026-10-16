@@ -1124,15 +1124,8 @@ export default function SimplifiedSocialSenseDashboard() {
             </form>
           </div>
 
-          <div className="mt-6 text-center text-[11px] text-zinc-500 flex flex-col items-center gap-2">
+          <div className="mt-6 text-center text-[11px] text-zinc-500">
             <span>Protected by SocialSense AI Security &bull; Powered by Gemini 3 Flash</span>
-            <Link
-              href="/admin"
-              className="text-zinc-400 hover:text-blue-400 transition-colors inline-flex items-center gap-1.5 text-xs font-medium bg-[#18181b] hover:bg-[#202024] border border-[#27272a] hover:border-blue-500/30 px-3 py-1.5 rounded-lg"
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
-              <span>Admin Tenant Provisioning &amp; Monitor Console &rarr;</span>
-            </Link>
           </div>
         </div>
       </div>
