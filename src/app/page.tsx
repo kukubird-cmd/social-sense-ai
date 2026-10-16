@@ -1590,6 +1590,93 @@ export default function SimplifiedSocialSenseDashboard() {
               </div>
             </div>
 
+            {/* Keyword Selector Bar - Allows Scraping and Filtering Each Keyword Separately */}
+            {keywords.length > 0 && (
+              <div className="bg-[#121215] border border-[#27272a] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5 mr-1">
+                    <Target className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Tracked Keywords:</span>
+                  </span>
+
+                  {/* All Keywords pill */}
+                  <button
+                    onClick={() => setSelectedKeyword("all")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      selectedKeyword === "all"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-[#18181b] text-zinc-300 hover:text-white hover:bg-zinc-800 border border-[#27272a]"
+                    }`}
+                  >
+                    All Keywords ({posts.length})
+                  </button>
+
+                  {/* Individual Keyword Pills with Separate Scrape Action */}
+                  {keywords.map((kw) => {
+                    const kwPostCount = posts.filter(
+                      (p) => p.keyword?.toLowerCase() === kw.keyword_string.toLowerCase()
+                    ).length;
+                    const isSelected = selectedKeyword.toLowerCase() === kw.keyword_string.toLowerCase();
+                    const isThisScraping = isScraping && currentScrapingKeyword?.keyword_id === kw.id;
+
+                    return (
+                      <div
+                        key={kw.id}
+                        className={`inline-flex items-center rounded-lg border transition-all text-xs overflow-hidden ${
+                          isSelected
+                            ? "bg-blue-500/15 border-blue-500/50 text-blue-200 shadow-sm"
+                            : "bg-[#18181b] border-[#27272a] text-zinc-300 hover:border-zinc-700"
+                        }`}
+                      >
+                        <button
+                          onClick={() => setSelectedKeyword(kw.keyword_string)}
+                          className="px-3 py-1.5 font-medium flex items-center gap-1.5 cursor-pointer hover:text-white"
+                          title={`View comments for "${kw.keyword_string}"`}
+                        >
+                          <span>#{kw.keyword_string}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/40 text-zinc-400 font-mono">
+                            {kwPostCount}
+                          </span>
+                        </button>
+
+                        {/* Separate Scrape Button for this specific keyword */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRunScrape(kw.id);
+                          }}
+                          disabled={isScraping}
+                          className={`px-2 py-1.5 border-l border-zinc-800 flex items-center gap-1 font-semibold text-[11px] transition-all cursor-pointer ${
+                            isThisScraping
+                              ? "bg-amber-500/20 text-amber-300 animate-pulse"
+                              : "hover:bg-blue-600 hover:text-white text-blue-400 bg-blue-500/5"
+                          }`}
+                          title={`Launch Apify scrapers separately for "${kw.keyword_string}" across TikTok, Reddit, Instagram, X, YouTube, and Threads`}
+                        >
+                          {isThisScraping ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <span>Scraping...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-2.5 h-2.5 fill-current" />
+                              <span>Scrape</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
+                  <span>{keywords.length} of {maxKeywords} keywords active</span>
+                </div>
+              </div>
+            )}
+
             {/* Active Filter Banner */}
             {(selectedSentiment !== "all" || mediaFilter !== "all" || selectedPlatform !== "all" || searchQuery) && (
               <div className="bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-[#18181b] border border-blue-500/30 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-md">

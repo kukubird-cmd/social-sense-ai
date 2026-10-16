@@ -93,11 +93,45 @@ export default function AdminMonitorPortal() {
   const [companyName, setCompanyName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
-  const [boughtKeyword, setBoughtKeyword] = useState<string>("");
+  const [keywordInputs, setKeywordInputs] = useState<string[]>([""]);
   const [topicContext, setTopicContext] = useState<string>("");
   const [maxKeywords, setMaxKeywords] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const addKeywordInputField = () => {
+    setKeywordInputs((prev) => {
+      const next = [...prev, ""];
+      setMaxKeywords((currMax) => Math.max(next.length, currMax));
+      return next;
+    });
+  };
+
+  const removeKeywordInputField = (index: number) => {
+    setKeywordInputs((prev) => {
+      if (prev.length <= 1) return [""];
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const updateKeywordInputField = (index: number, val: string) => {
+    setKeywordInputs((prev) => {
+      const next = [...prev];
+      next[index] = val;
+      return next;
+    });
+  };
+
+  const handleMaxKeywordsChange = (val: number) => {
+    const quota = Math.max(1, val);
+    setMaxKeywords(quota);
+    setKeywordInputs((prev) => {
+      if (quota > prev.length) {
+        return [...prev, ...Array(quota - prev.length).fill("")];
+      }
+      return prev;
+    });
+  };
 
   // Success provision result
   const [provisionSuccess, setProvisionSuccess] = useState<any | null>(null);
@@ -188,6 +222,25 @@ export default function AdminMonitorPortal() {
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.detail || "Failed to add keyword.");
+      }
+    } catch (err: any) {
+      alert(`Network error: ${err.message || "Failed to reach backend."}`);
+    }
+  };
+
+  const handleDeleteKeywordFromClient = async (companyId: string, keywordId: string, keywordString: string) => {
+    if (!window.confirm(`Delete tracked keyword "${keywordString}" from this client?`)) return;
+    const activeUrl = (backendUrl || API_BASE || "http://localhost:8000").replace(/\/+$/, "");
+    try {
+      const res = await fetch(`${activeUrl}/api/admin/clients/${companyId}/keywords/${keywordId}`, {
+        method: "DELETE",
+        headers: { "x-admin-key": adminKey.trim() }
+      });
+      if (res.ok) {
+        await fetchClients(adminKey, activeUrl);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Failed to delete keyword.");
       }
     } catch (err: any) {
       alert(`Network error: ${err.message || "Failed to reach backend."}`);
@@ -319,14 +372,30 @@ export default function AdminMonitorPortal() {
     e.preventDefault();
     setFormError(null);
 
-    if (!companyName.trim() || !email.trim() || !password.trim() || !boughtKeyword.trim()) {
-      setFormError("All required fields must be filled.");
+    const cleanedKws: string[] = [];
+    keywordInputs.forEach((kw) => {
+      kw.replace(";", ",").split(",").forEach((part) => {
+        const clean = part.trim();
+        if (clean && !cleanedKws.includes(clean)) {
+          cleanedKws.push(clean);
+        }
+      });
+    });
+
+    if (!companyName.trim() || !email.trim() || !password.trim()) {
+      setFormError("Company name, client email, and password must all be filled.");
+      return;
+    }
+
+    if (cleanedKws.length === 0) {
+      setFormError("Please enter at least one bought tracked keyword.");
       return;
     }
 
     setIsSubmitting(true);
     try {
       const activeUrl = (backendUrl || API_BASE || "http://localhost:8000").replace(/\/+$/, "");
+      const calculatedQuota = Math.max(cleanedKws.length, Number(maxKeywords) || 1);
       const res = await fetch(`${activeUrl}/api/admin/provision`, {
         method: "POST",
         headers: {
@@ -337,9 +406,9 @@ export default function AdminMonitorPortal() {
           company_name: companyName.trim(),
           email: email.trim(),
           password: password.trim(),
-          bought_keyword: boughtKeyword.trim(),
+          bought_keyword: cleanedKws.join(", "),
           topic_context: topicContext.trim(),
-          max_keywords: Number(maxKeywords) || 1
+          max_keywords: calculatedQuota
         })
       });
 
@@ -350,7 +419,7 @@ export default function AdminMonitorPortal() {
         setCompanyName("");
         setEmail("");
         setPassword("");
-        setBoughtKeyword("");
+        setKeywordInputs([""]);
         setTopicContext("");
         setMaxKeywords(1);
         await fetchClients(adminKey, activeUrl);
@@ -405,19 +474,26 @@ export default function AdminMonitorPortal() {
   const copyWelcomeTemplate = () => {
     if (!provisionSuccess) return;
     const loginUrl = window.location.origin;
-    const kwDisplay = Array.isArray(provisionSuccess.keywords) && provisionSuccess.keywords.length > 0
-      ? provisionSuccess.keywords.map((k: any) => `"${k.keyword_string}"`).join(", ")
-      : `"${provisionSuccess.keyword?.keyword_string || ""}"`;
-    const quotaDisplay = provisionSuccess.max_keywords || provisionSuccess.company?.max_keywords || 1;
+    const kwItems: string[] = [];
+    if (Array.isArray(provisionSuccess.keywords) && provisionSuccess.keywords.length > 0) {
+      provisionSuccess.keywords.forEach((k: any, idx: number) => {
+        kwItems.push(`   ${idx + 1}. "${k.keyword_string}" (Scrapes TikTok, Reddit, Instagram, X, YouTube, Threads)`);
+      });
+    } else if (provisionSuccess.keyword?.keyword_string) {
+      kwItems.push(`   1. "${provisionSuccess.keyword.keyword_string}" (Scrapes TikTok, Reddit, Instagram, X, YouTube, Threads)`);
+    }
+    const quotaDisplay = provisionSuccess.max_keywords || provisionSuccess.company?.max_keywords || kwItems.length || 1;
     const text = `🎉 Welcome to SocialSense AI!
 
 Here are your dedicated workspace login credentials:
 🌐 Dashboard URL: ${loginUrl}
 👤 Login Email: ${provisionSuccess.credentials.email}
 🔑 Password: ${provisionSuccess.credentials.password}
-🎯 Tracked Keyword(s): ${kwDisplay} (Plan Quota: ${quotaDisplay} Keywords)
 
-Log in anytime to run real-time market research and AI competitor sentiment analysis!`;
+🎯 Authorized Tracked Keyword(s) (${quotaDisplay} Allowed):
+${kwItems.join("\n")}
+
+ℹ️ Each keyword can be monitored and scraped separately in your dashboard!`;
 
     navigator.clipboard.writeText(text);
     setCopiedText(true);
@@ -889,13 +965,15 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
               onClick={() => {
                 setFormError(null);
                 setProvisionSuccess(null);
+                setKeywordInputs([""]);
+                setMaxKeywords(1);
                 generateRandomPassword();
                 setIsModalOpen(true);
               }}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-blue-500/20 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Provision New Client & Keyword</span>
+              <span>Provision New Client & Keywords</span>
             </button>
           </div>
         </div>
@@ -930,7 +1008,7 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                       <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30 text-zinc-400" />
                       <p className="text-zinc-400 font-medium">No client workspaces found</p>
                       <p className="text-[11px] text-zinc-600 mt-1">
-                        Click "Provision New Client & Keyword" to onboard your first paying client.
+                        Click "Provision New Client & Keywords" to onboard your first paying client.
                       </p>
                     </td>
                   </tr>
@@ -1016,10 +1094,18 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                               client.assigned_keywords.map((kw) => (
                                 <div
                                   key={kw.id}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-medium"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-medium group/kw"
                                 >
                                   <Lock className="w-2.5 h-2.5 text-blue-400" />
                                   <span>"{kw.keyword_string}"</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteKeywordFromClient(client.id, kw.id, kw.keyword_string)}
+                                    className="text-zinc-500 hover:text-rose-400 transition ml-0.5 cursor-pointer"
+                                    title={`Delete keyword "${kw.keyword_string}"`}
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
                                 </div>
                               ))
                             ) : (
@@ -1163,19 +1249,25 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                     <span className="text-zinc-500">Password:</span>
                     <span className="text-emerald-400 font-bold">{provisionSuccess.credentials.password}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Bought Keyword(s):</span>
-                    <span className="text-amber-400 font-semibold">
-                      {Array.isArray(provisionSuccess.keywords) && provisionSuccess.keywords.length > 0
-                        ? provisionSuccess.keywords.map((k: any) => `"${k.keyword_string}"`).join(", ")
-                        : `"${provisionSuccess.keyword?.keyword_string || ""}"`}
-                    </span>
+                  <div className="pt-1 border-t border-[#27272a]/60">
+                    <span className="text-zinc-500 block mb-1.5">Authorized Tracked Keywords ({provisionSuccess.keywords?.length || 1}):</span>
+                    <div className="space-y-1.5 pl-1">
+                      {(provisionSuccess.keywords || [provisionSuccess.keyword]).map((kwItem: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs">
+                          <span className="text-zinc-500 font-mono text-[10px]">#{idx + 1}</span>
+                          <span className="text-amber-400 font-semibold font-mono px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                            "{kwItem?.keyword_string}"
+                          </span>
+                          <span className="text-[10px] text-emerald-400">
+                            ✓ Scrapes TikTok, Reddit, IG, X, YouTube, Threads separately
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Keyword Quota:</span>
-                    <span className="text-zinc-300 font-semibold">
-                      {provisionSuccess.max_keywords || provisionSuccess.company?.max_keywords || 1} Keywords Allowed
-                    </span>
+                  <div className="flex justify-between pt-1">
+                    <span className="text-zinc-500">Allowed Keyword Quota:</span>
+                    <span className="text-emerald-400 font-bold">{provisionSuccess.max_keywords || 1} Keywords Allowed</span>
                   </div>
                 </div>
 
@@ -1264,53 +1356,80 @@ Log in anytime to run real-time market research and AI competitor sentiment anal
                 </div>
 
                 <div className="p-3.5 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-blue-300 mb-1 flex items-center gap-1.5">
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>Bought Tracked Keyword(s) *</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={boughtKeyword}
-                        onChange={(e) => setBoughtKeyword(e.target.value)}
-                        placeholder="e.g. nike, airmax, jordan (comma-separated)"
-                        className="w-full bg-[#18181b] border border-blue-500/30 focus:border-blue-400 text-xs text-white rounded-xl px-3 py-2 outline-none transition-all"
-                      />
-                      <p className="text-[10px] text-zinc-400 mt-1">
-                        Separate multiple keywords with commas. Client can only track these keywords.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                        Allowed Quota *
-                      </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-blue-300 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Bought Tracked Keywords (Separate Scrapes) *</span>
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-zinc-400">Total Quota:</span>
                       <input
                         type="number"
                         min={1}
                         max={50}
-                        required
                         value={maxKeywords}
-                        onChange={(e) => setMaxKeywords(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full bg-[#18181b] border border-[#27272a] focus:border-blue-500 text-xs text-white rounded-xl px-3 py-2 outline-none transition-all font-mono"
+                        onChange={(e) => handleMaxKeywordsChange(parseInt(e.target.value) || 1)}
+                        className="w-16 bg-[#18181b] border border-[#27272a] focus:border-blue-500 text-xs text-white rounded-lg px-2 py-1 text-center font-mono font-bold"
+                        title="Allowed keyword quota limit"
                       />
-                      <p className="text-[10px] text-zinc-400 mt-1">
-                        Max keywords allowed
-                      </p>
                     </div>
                   </div>
 
-                  <div>
+                  <p className="text-[11px] text-zinc-400">
+                    Enter each keyword this client purchased. In their dashboard, they can <strong>scrape each keyword separately</strong>.
+                  </p>
+
+                  <div className="space-y-2">
+                    {keywordInputs.map((kwVal, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="w-6 text-[11px] font-mono font-semibold text-zinc-400 text-right shrink-0">
+                          #{idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          required={idx === 0}
+                          value={kwVal}
+                          onChange={(e) => updateKeywordInputField(idx, e.target.value)}
+                          placeholder={idx === 0 ? "e.g. Play Nation" : idx === 1 ? "e.g. Nintendo" : `Keyword #${idx + 1}`}
+                          className="flex-1 bg-[#18181b] border border-blue-500/30 focus:border-blue-400 text-xs text-white rounded-xl px-3 py-2 outline-none transition-all placeholder:text-zinc-600 font-medium"
+                        />
+                        {keywordInputs.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeKeywordInputField(idx)}
+                            className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
+                            title="Remove this keyword field"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={addKeywordInputField}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Add Another Keyword Field</span>
+                    </button>
+                    <span className="text-[10px] text-zinc-500">
+                      {keywordInputs.filter(k => k.trim()).length} of {maxKeywords} quota filled
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-zinc-800">
                     <label className="block text-xs font-medium text-zinc-300 mb-1">
-                      Topic Context (Optional)
+                      Topic Context (Optional disambiguation focus)
                     </label>
                     <input
                       type="text"
                       value={topicContext}
                       onChange={(e) => setTopicContext(e.target.value)}
-                      placeholder="e.g. Running shoes, activewear, marathon sponsors"
+                      placeholder="e.g. Board games cafe, party games, console gaming"
                       className="w-full bg-[#18181b] border border-[#27272a] focus:border-blue-500 text-xs text-white rounded-xl px-3 py-2 outline-none transition-all placeholder:text-zinc-600"
                     />
                   </div>
