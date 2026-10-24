@@ -862,15 +862,15 @@ export default function SimplifiedSocialSenseDashboard() {
   // Trigger live Apify scrape
   const handleRunScrape = async (keywordId: string) => {
     setIsScraping(true);
-    setScrapeNotice("Launching maximum-depth Apify scrapers across TikTok, Instagram, X, YouTube, and Threads in the cloud...");
+    setScrapeNotice("Launching Apify scrapers (1,000 posts per platform) across TikTok, Instagram, X, YouTube, and Threads...");
 
     try {
-      const res = await fetch(`${API_BASE}/api/scraper/trigger/${keywordId}?company_id=${encodeURIComponent(activeCompanyId)}&limit=2500`, {
+      const res = await fetch(`${API_BASE}/api/scraper/trigger/${keywordId}?company_id=${encodeURIComponent(activeCompanyId)}&limit=1000`, {
         method: "POST"
       });
       if (res.ok) {
         setIsScraping(true);
-        setScrapeNotice("Deep scrapers triggered! Maximum data quota is being used and will automatically be added to your feed as soon as actors finish.");
+        setScrapeNotice("✅ Scrapers launched — collecting up to 1,000 posts per platform (4,000 total). Data populates your feed as actors complete.");
         setTimeout(() => checkScraperStatus(), 1000);
       } else {
         setIsScraping(false);
@@ -902,7 +902,7 @@ export default function SimplifiedSocialSenseDashboard() {
     }
 
     setIsScraping(true);
-    setScrapeNotice(`🚀 Launching maximum-depth Apify scrapers for "${cleanKw}" across TikTok, Instagram, X, YouTube, and Threads...`);
+    setScrapeNotice(`🚀 Launching Apify scrapers for "${cleanKw}" — 1,000 posts each across TikTok, Instagram, X, YouTube, and Threads...`);
 
     try {
       const res = await fetch(`${API_BASE}/api/scraper/quick-scrape`, {
@@ -912,7 +912,7 @@ export default function SimplifiedSocialSenseDashboard() {
           company_id: activeCompanyId,
           keyword_string: cleanKw,
           platforms: "tiktok,instagram,twitter,youtube,threads",
-          limit: 2500
+          limit: 1000
         })
       });
 
@@ -2188,7 +2188,7 @@ export default function SimplifiedSocialSenseDashboard() {
                   </span>
                 </div>
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  Your organization is subscribed to the <strong>Enterprise Market Intelligence Tier</strong>. Each tracked brand term collects up to 2,500 posts/comments per platform across TikTok, Instagram, X, YouTube, and Threads with deep quota extraction.
+                  Your organization is subscribed to the <strong>Enterprise Market Intelligence Tier</strong>. Each tracked keyword scrapes <strong>1,000 posts per platform</strong> across TikTok, Instagram, X, YouTube, and Threads — totalling <strong>5,000 posts per keyword</strong> and up to <strong>15,000 posts for 3 keywords</strong>.
                 </p>
               </div>
 
