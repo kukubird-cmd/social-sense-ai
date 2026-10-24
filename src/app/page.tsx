@@ -571,7 +571,7 @@ export default function SimplifiedSocialSenseDashboard() {
     if (!compId) return;
     setIsLoadingPosts(true);
     try {
-      const res = await fetch(`${API_BASE}/api/companies/${compId}/scraped-data`);
+      const res = await fetch(`${API_BASE}/api/companies/${compId}/scraped-data?limit=50000`);
       if (res.ok) {
         const data = await res.json();
         const rawList = Array.isArray(data) ? data : data.records || [];
