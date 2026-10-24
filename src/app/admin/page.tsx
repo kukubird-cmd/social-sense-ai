@@ -477,10 +477,10 @@ export default function AdminMonitorPortal() {
     const kwItems: string[] = [];
     if (Array.isArray(provisionSuccess.keywords) && provisionSuccess.keywords.length > 0) {
       provisionSuccess.keywords.forEach((k: any, idx: number) => {
-        kwItems.push(`   ${idx + 1}. "${k.keyword_string}" (Scrapes TikTok, Reddit, Instagram, X, YouTube, Threads)`);
+        kwItems.push(`   ${idx + 1}. "${k.keyword_string}" (Scrapes TikTok, Instagram, X, YouTube, Threads)`);
       });
     } else if (provisionSuccess.keyword?.keyword_string) {
-      kwItems.push(`   1. "${provisionSuccess.keyword.keyword_string}" (Scrapes TikTok, Reddit, Instagram, X, YouTube, Threads)`);
+      kwItems.push(`   1. "${provisionSuccess.keyword.keyword_string}" (Scrapes TikTok, Instagram, X, YouTube, Threads)`);
     }
     const quotaDisplay = provisionSuccess.max_keywords || provisionSuccess.company?.max_keywords || kwItems.length || 1;
     const text = `🎉 Welcome to SocialSense AI!
@@ -1259,7 +1259,7 @@ ${kwItems.join("\n")}
                             "{kwItem?.keyword_string}"
                           </span>
                           <span className="text-[10px] text-emerald-400">
-                            ✓ Scrapes TikTok, Reddit, IG, X, YouTube, Threads separately
+                            ✓ Scrapes TikTok, IG, X, YouTube, Threads separately
                           </span>
                         </div>
                       ))}

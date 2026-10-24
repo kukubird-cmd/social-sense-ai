@@ -550,7 +550,7 @@ export default function SimplifiedSocialSenseDashboard() {
     {
       id: "welcome-1",
       sender: "gemini",
-      text: "Hello! I am your **Gemini AI Social Analyst**.\n\nI have direct access to your live database of scraped comments and posts across TikTok, Reddit, Instagram, X/Twitter, YouTube, and Threads.\n\nAsk me anything — I will analyze real social discussions, summarize public sentiment, or flag crisis issues for you!",
+      text: "Hello! I am your **Gemini AI Social Analyst**.\n\nI have direct access to your live database of scraped comments and posts across TikTok, Instagram, X/Twitter, YouTube, and Threads.\n\nAsk me anything — I will analyze real social discussions, summarize public sentiment, or flag crisis issues for you!",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     }
   ]);
@@ -762,7 +762,6 @@ export default function SimplifiedSocialSenseDashboard() {
             tiktok: true,
             instagram: true,
             twitter: true,
-            reddit: true,
             youtube: true,
             threads: true
           }
@@ -784,7 +783,7 @@ export default function SimplifiedSocialSenseDashboard() {
         keyword_string: newKeywordInput.trim(),
         topic_context: newTopicContextInput.trim(),
         is_active: true,
-        platform_flags: { tiktok: true, instagram: true, twitter: true, reddit: true, youtube: true, threads: true },
+        platform_flags: { tiktok: true, instagram: true, twitter: true, youtube: true, threads: true },
         created_at: new Date().toISOString()
       };
       const updated = [...keywords, fallbackItem];
@@ -863,15 +862,15 @@ export default function SimplifiedSocialSenseDashboard() {
   // Trigger live Apify scrape
   const handleRunScrape = async (keywordId: string) => {
     setIsScraping(true);
-    setScrapeNotice("Launching Apify scraper actors (100 posts per platform) across TikTok, Reddit, Instagram, X, YouTube, and Threads in the cloud...");
+    setScrapeNotice("Launching maximum-depth Apify scrapers across TikTok, Instagram, X, YouTube, and Threads in the cloud...");
 
     try {
-      const res = await fetch(`${API_BASE}/api/scraper/trigger/${keywordId}?company_id=${encodeURIComponent(activeCompanyId)}&limit=100`, {
+      const res = await fetch(`${API_BASE}/api/scraper/trigger/${keywordId}?company_id=${encodeURIComponent(activeCompanyId)}&limit=2500`, {
         method: "POST"
       });
       if (res.ok) {
         setIsScraping(true);
-        setScrapeNotice("Scrapers triggered (100 posts per platform)! Data is automatically downloaded and added to your feed as soon as actors finish.");
+        setScrapeNotice("Deep scrapers triggered! Maximum data quota is being used and will automatically be added to your feed as soon as actors finish.");
         setTimeout(() => checkScraperStatus(), 1000);
       } else {
         setIsScraping(false);
@@ -903,7 +902,7 @@ export default function SimplifiedSocialSenseDashboard() {
     }
 
     setIsScraping(true);
-    setScrapeNotice(`🚀 Launching Apify scrapers for "${cleanKw}" (100 posts per platform) across TikTok, Reddit, Instagram, X, YouTube, and Threads...`);
+    setScrapeNotice(`🚀 Launching maximum-depth Apify scrapers for "${cleanKw}" across TikTok, Instagram, X, YouTube, and Threads...`);
 
     try {
       const res = await fetch(`${API_BASE}/api/scraper/quick-scrape`, {
@@ -912,8 +911,8 @@ export default function SimplifiedSocialSenseDashboard() {
         body: JSON.stringify({
           company_id: activeCompanyId,
           keyword_string: cleanKw,
-          platforms: "tiktok,instagram,twitter,reddit,youtube,threads",
-          limit: 100
+          platforms: "tiktok,instagram,twitter,youtube,threads",
+          limit: 2500
         })
       });
 
@@ -1516,7 +1515,6 @@ export default function SimplifiedSocialSenseDashboard() {
                 >
                   <option value="all">All Platforms</option>
                   <option value="tiktok">TikTok</option>
-                  <option value="reddit">Reddit</option>
                   <option value="instagram">Instagram</option>
                   <option value="threads">Threads</option>
                   <option value="twitter">X / Twitter</option>
@@ -1651,7 +1649,7 @@ export default function SimplifiedSocialSenseDashboard() {
                               ? "bg-amber-500/20 text-amber-300 animate-pulse"
                               : "hover:bg-blue-600 hover:text-white text-blue-400 bg-blue-500/5"
                           }`}
-                          title={`Launch Apify scrapers separately for "${kw.keyword_string}" across TikTok, Reddit, Instagram, X, YouTube, and Threads`}
+                          title={`Launch Apify scrapers separately for "${kw.keyword_string}" across TikTok, Instagram, X, YouTube, and Threads`}
                         >
                           {isThisScraping ? (
                             <>
@@ -1762,7 +1760,7 @@ export default function SimplifiedSocialSenseDashboard() {
                 </h3>
                 <p className="text-xs text-zinc-400 max-w-lg mx-auto mb-5 leading-relaxed">
                   {searchQuery
-                    ? `"${searchQuery}" hasn't been scraped yet, or no social mentions match your active filters. Click below to launch live Apify scrapers across TikTok, Reddit, Instagram, X, YouTube, and Threads!`
+                    ? `"${searchQuery}" hasn't been scraped yet, or no social mentions match your active filters. Click below to launch live Apify scrapers across TikTok, Instagram, X, YouTube, and Threads!`
                     : selectedPlatform !== "all" || selectedSentiment !== "all" || selectedKeyword !== "all"
                     ? "No posts match your selected filters. Try clearing your filters or search query."
                     : "No social data has been scraped yet. Add a keyword in the Keywords tab and run a scrape!"}
@@ -2123,10 +2121,10 @@ export default function SimplifiedSocialSenseDashboard() {
                 Summarize Complaints & Sentiment
               </button>
               <button
-                onClick={() => handleSendChatMessage("What are people specifically discussing on Reddit vs TikTok?")}
+                onClick={() => handleSendChatMessage("What are people specifically discussing on Instagram vs TikTok?")}
                 className="px-3 py-1 rounded-full bg-[#18181b] hover:bg-[#27272a] border border-[#27272a] text-zinc-300 hover:text-white transition-colors flex-shrink-0"
               >
-                Reddit vs TikTok Comparison
+                Instagram vs TikTok Comparison
               </button>
               <button
                 onClick={() => handleSendChatMessage("Are there any urgent PR crisis threats or boycott signals in the data?")}
@@ -2190,7 +2188,7 @@ export default function SimplifiedSocialSenseDashboard() {
                   </span>
                 </div>
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  Your organization is subscribed to the <strong>Enterprise Market Intelligence Tier</strong>. Each tracked brand term collects up to 100 posts per platform across TikTok, Instagram, Reddit, X, YouTube, and Threads with strict single-keyword concurrency and isolation.
+                  Your organization is subscribed to the <strong>Enterprise Market Intelligence Tier</strong>. Each tracked brand term collects up to 2,500 posts/comments per platform across TikTok, Instagram, X, YouTube, and Threads with deep quota extraction.
                 </p>
               </div>
 
@@ -2348,7 +2346,7 @@ export default function SimplifiedSocialSenseDashboard() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-3 text-xs text-zinc-400 mt-1">
-                            <span>Platforms: TikTok, Reddit, Instagram, X, YouTube, Threads</span>
+                            <span>Platforms: TikTok, Instagram, X, YouTube, Threads</span>
                             <button
                               onClick={() => {
                                 setEditingKeywordId(kw.id);
