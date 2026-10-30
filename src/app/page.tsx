@@ -1021,10 +1021,10 @@ export default function SimplifiedSocialSenseDashboard() {
     if (!presetText) setChatInput("");
     setIsChatLoading(true);
     try {
-      // Enforce strict single-keyword scoping for Gemini AI analysis
+      // Scope to specific keyword if user selected one; otherwise allow multi-keyword cross-analysis
       const activeKw = selectedKeyword !== "all" 
         ? keywords.find((k) => k.keyword_string.toLowerCase() === selectedKeyword.toLowerCase()) 
-        : (keywords.length > 0 ? keywords[0] : null);
+        : null;
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
