@@ -42,7 +42,10 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  Maximize2
+  Maximize2,
+  Calendar,
+  CalendarDays,
+  Clock
 } from "lucide-react";
 
 // Platform colors & badges
@@ -521,6 +524,65 @@ export default function SimplifiedSocialSenseDashboard() {
   const [inspectingPost, setInspectingPost] = useState<ScrapedPost | null>(null);
   const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(new Set());
 
+  // Timeline Filtering States (Owner-chosen timeline e.g. September 2026)
+  const [timelinePreset, setTimelinePreset] = useState<string>("all");
+  const [timelineMonth, setTimelineMonth] = useState<string>("2026-09");
+  const [timelineCustomStart, setTimelineCustomStart] = useState<string>("");
+  const [timelineCustomEnd, setTimelineCustomEnd] = useState<string>("");
+
+  const { activeStartDate, activeEndDate, timelineLabel } = useMemo(() => {
+    const now = new Date();
+    if (timelinePreset === "this_month") {
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+      return {
+        activeStartDate: `${y}-${m}-01`,
+        activeEndDate: `${y}-${m}-${String(lastDay).padStart(2, "0")}`,
+        timelineLabel: `This Month (${now.toLocaleString("default", { month: "short", year: "numeric" })})`
+      };
+    }
+    if (timelinePreset === "last_month") {
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const y = prev.getFullYear();
+      const m = String(prev.getMonth() + 1).padStart(2, "0");
+      const lastDay = new Date(y, prev.getMonth() + 1, 0).getDate();
+      return {
+        activeStartDate: `${y}-${m}-01`,
+        activeEndDate: `${y}-${m}-${String(lastDay).padStart(2, "0")}`,
+        timelineLabel: `Last Month (${prev.toLocaleString("default", { month: "short", year: "numeric" })})`
+      };
+    }
+    if (timelinePreset === "specific_month" && timelineMonth) {
+      const parts = timelineMonth.split("-");
+      if (parts.length === 2) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (!isNaN(y) && !isNaN(m)) {
+          const lastDay = new Date(y, m, 0).getDate();
+          const monthName = new Date(y, m - 1, 1).toLocaleString("default", { month: "short", year: "numeric" });
+          return {
+            activeStartDate: `${timelineMonth}-01`,
+            activeEndDate: `${timelineMonth}-${String(lastDay).padStart(2, "0")}`,
+            timelineLabel: monthName
+          };
+        }
+      }
+    }
+    if (timelinePreset === "custom") {
+      return {
+        activeStartDate: timelineCustomStart || undefined,
+        activeEndDate: timelineCustomEnd || undefined,
+        timelineLabel: timelineCustomStart && timelineCustomEnd ? `${timelineCustomStart} → ${timelineCustomEnd}` : "Custom Range"
+      };
+    }
+    return {
+      activeStartDate: undefined,
+      activeEndDate: undefined,
+      timelineLabel: "All Time"
+    };
+  }, [timelinePreset, timelineMonth, timelineCustomStart, timelineCustomEnd]);
+
   const toggleExpandPost = (id: string) => {
     setExpandedPostIds((prev) => {
       const next = new Set(prev);
@@ -862,15 +924,20 @@ export default function SimplifiedSocialSenseDashboard() {
   // Trigger live Apify scrape
   const handleRunScrape = async (keywordId: string) => {
     setIsScraping(true);
-    setScrapeNotice("Launching Apify scrapers (1,000 posts per platform) across TikTok, Instagram, X, YouTube, and Threads...");
+    const windowMsg = timelineLabel !== "All Time" ? ` (Timeline: ${timelineLabel})` : "";
+    setScrapeNotice(`Launching Apify scrapers${windowMsg} across TikTok, Instagram, X, YouTube, and Threads...`);
 
     try {
-      const res = await fetch(`${API_BASE}/api/scraper/trigger/${keywordId}?company_id=${encodeURIComponent(activeCompanyId)}&limit=1000`, {
+      let url = `${API_BASE}/api/scraper/trigger/${keywordId}?company_id=${encodeURIComponent(activeCompanyId)}&limit=1000`;
+      if (activeStartDate) url += `&start_date=${encodeURIComponent(activeStartDate)}`;
+      if (activeEndDate) url += `&end_date=${encodeURIComponent(activeEndDate)}`;
+
+      const res = await fetch(url, {
         method: "POST"
       });
       if (res.ok) {
         setIsScraping(true);
-        setScrapeNotice("✅ Scrapers launched — collecting up to 1,000 posts per platform (4,000 total). Data populates your feed as actors complete.");
+        setScrapeNotice(`✅ Scrapers launched${windowMsg} — collecting up to 1,000 posts per platform. Data populates your feed as actors complete.`);
         setTimeout(() => checkScraperStatus(), 1000);
       } else {
         setIsScraping(false);
@@ -902,7 +969,8 @@ export default function SimplifiedSocialSenseDashboard() {
     }
 
     setIsScraping(true);
-    setScrapeNotice(`🚀 Launching Apify scrapers for "${cleanKw}" — 1,000 posts each across TikTok, Instagram, X, YouTube, and Threads...`);
+    const windowMsg = timelineLabel !== "All Time" ? ` [Timeline: ${timelineLabel}]` : "";
+    setScrapeNotice(`🚀 Launching Apify scrapers for "${cleanKw}"${windowMsg} — 1,000 posts each across TikTok, Instagram, X, YouTube, and Threads...`);
 
     try {
       const res = await fetch(`${API_BASE}/api/scraper/quick-scrape`, {
@@ -912,13 +980,15 @@ export default function SimplifiedSocialSenseDashboard() {
           company_id: activeCompanyId,
           keyword_string: cleanKw,
           platforms: "tiktok,instagram,twitter,youtube,threads",
-          limit: 1000
+          limit: 1000,
+          start_date: activeStartDate || undefined,
+          end_date: activeEndDate || undefined
         })
       });
 
       if (res.ok) {
         setIsScraping(true);
-        setScrapeNotice(`✅ Scrapers launched for "${cleanKw}"! Ingesting real data into your live feed as actors complete.`);
+        setScrapeNotice(`✅ Scrapers launched for "${cleanKw}"${windowMsg}! Ingesting real data into your live feed as actors complete.`);
         await fetchKeywords(activeCompanyId);
         setTimeout(() => checkScraperStatus(), 1000);
       } else {
@@ -994,7 +1064,7 @@ export default function SimplifiedSocialSenseDashboard() {
     }
   };
 
-  // Filtered post list
+  // Filtered post list (keyword, search, platform, sentiment, media type, and timeline)
   const filteredPosts = useMemo(() => {
     return posts.filter((p) => {
       const matchesSearch =
@@ -1011,15 +1081,31 @@ export default function SimplifiedSocialSenseDashboard() {
         (mediaFilter === "earned" && !p.is_owned_media) ||
         (mediaFilter === "owned" && Boolean(p.is_owned_media));
 
-      return matchesSearch && matchesPlatform && matchesSentiment && matchesKeyword && matchesMedia;
-    });
-  }, [posts, searchQuery, selectedPlatform, selectedSentiment, selectedKeyword, mediaFilter]);
+      let matchesTimeline = true;
+      if (activeStartDate && p.timestamp) {
+        matchesTimeline = matchesTimeline && new Date(p.timestamp) >= new Date(activeStartDate + "T00:00:00");
+      }
+      if (activeEndDate && p.timestamp) {
+        matchesTimeline = matchesTimeline && new Date(p.timestamp) <= new Date(activeEndDate + "T23:59:59");
+      }
 
-  // Sentiment counts (strictly scoped to the currently selected keyword)
+      return matchesSearch && matchesPlatform && matchesSentiment && matchesKeyword && matchesMedia && matchesTimeline;
+    });
+  }, [posts, searchQuery, selectedPlatform, selectedSentiment, selectedKeyword, mediaFilter, activeStartDate, activeEndDate]);
+
+  // Sentiment counts (strictly scoped to current keyword and active timeline)
   const sentimentCounts = useMemo(() => {
-    const scopedPosts = selectedKeyword === "all"
-      ? posts
-      : posts.filter((p) => p.keyword.toLowerCase() === selectedKeyword.toLowerCase());
+    const scopedPosts = posts.filter((p) => {
+      const matchKw = selectedKeyword === "all" || p.keyword.toLowerCase() === selectedKeyword.toLowerCase();
+      let matchTime = true;
+      if (activeStartDate && p.timestamp) {
+        matchTime = matchTime && new Date(p.timestamp) >= new Date(activeStartDate + "T00:00:00");
+      }
+      if (activeEndDate && p.timestamp) {
+        matchTime = matchTime && new Date(p.timestamp) <= new Date(activeEndDate + "T23:59:59");
+      }
+      return matchKw && matchTime;
+    });
     const pos = scopedPosts.filter((p) => (p.sentiment || "").toLowerCase() === "positive").length;
     const neu = scopedPosts.filter((p) => (p.sentiment || "").toLowerCase() === "neutral").length;
     const neg = scopedPosts.filter((p) => (p.sentiment || "").toLowerCase() === "negative").length;
@@ -1027,7 +1113,7 @@ export default function SimplifiedSocialSenseDashboard() {
     const owned = scopedPosts.filter((p) => Boolean(p.is_owned_media)).length;
     const earned = scopedPosts.length - owned;
     return { pos, neu, neg, cri, owned, earned, total: scopedPosts.length };
-  }, [posts, selectedKeyword]);
+  }, [posts, selectedKeyword, activeStartDate, activeEndDate]);
 
   if (!isLoggedIn) {
     return (
@@ -1542,6 +1628,66 @@ export default function SimplifiedSocialSenseDashboard() {
                   <option value="earned">👤 Audience Comments ({sentimentCounts.earned})</option>
                   <option value="owned">📢 Owned Media / Promo ({sentimentCounts.owned})</option>
                 </select>
+
+                {/* Timeline Window Filter & Scraper Scope */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="relative flex items-center">
+                    <select
+                      id="feed-timeline-preset"
+                      value={timelinePreset}
+                      onChange={(e) => setTimelinePreset(e.target.value)}
+                      className={`text-xs rounded-lg px-2.5 py-2 focus:outline-none transition-colors border font-medium cursor-pointer ${
+                        timelinePreset !== "all"
+                          ? "bg-blue-950/60 border-blue-500/60 text-blue-300 shadow-sm shadow-blue-500/20"
+                          : "bg-[#18181b] border-[#27272a] text-zinc-300 focus:border-blue-500"
+                      }`}
+                      title="Select timeline window for scraping and feed analysis"
+                    >
+                      <option value="all">🗓️ All Time</option>
+                      <option value="this_month">🗓️ This Month</option>
+                      <option value="last_month">🗓️ Last Month</option>
+                      <option value="specific_month">📅 Specific Month (e.g. Sep 2026)</option>
+                      <option value="custom">📆 Custom Date Range</option>
+                    </select>
+                  </div>
+
+                  {timelinePreset === "specific_month" && (
+                    <input
+                      type="month"
+                      value={timelineMonth}
+                      onChange={(e) => setTimelineMonth(e.target.value)}
+                      className="bg-[#18181b] border border-blue-500/50 text-xs text-blue-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400 font-medium"
+                      title="Pick specific year and month (e.g. 2026-09)"
+                    />
+                  )}
+
+                  {timelinePreset === "custom" && (
+                    <div className="flex items-center gap-1 bg-[#18181b] border border-blue-500/50 rounded-lg px-2 py-1">
+                      <input
+                        type="date"
+                        value={timelineCustomStart}
+                        onChange={(e) => setTimelineCustomStart(e.target.value)}
+                        className="bg-transparent text-xs text-blue-300 focus:outline-none"
+                        title="Start Date"
+                      />
+                      <span className="text-zinc-500 text-xs">→</span>
+                      <input
+                        type="date"
+                        value={timelineCustomEnd}
+                        onChange={(e) => setTimelineCustomEnd(e.target.value)}
+                        className="bg-transparent text-xs text-blue-300 focus:outline-none"
+                        title="End Date"
+                      />
+                    </div>
+                  )}
+
+                  {timelinePreset !== "all" && (
+                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2 py-1 rounded-md whitespace-nowrap">
+                      <Clock className="w-3 h-3 text-blue-400" />
+                      <span>{timelineLabel}</span>
+                    </span>
+                  )}
+                </div>
 
                 {isScraping ? (
                   <button
